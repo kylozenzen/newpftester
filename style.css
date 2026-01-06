@@ -1,6 +1,12 @@
 
     * { box-sizing: border-box; }
 
+:root {
+  --accent: #8b5cf6;
+  --accent-2: #7c3aed;
+  --accent-soft: rgba(139, 92, 246, 0.12);
+}
+
     /* BASE LIGHT MODE - Better visual fidelity */
 body { 
   font-family: 'Inter', sans-serif; 
@@ -34,9 +40,9 @@ body.dark-mode {
 body.dark-mode .bg-white { 
   background: #1a1a1a !important; 
   color: #e5e5e5 !important;
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15),
-              0 0 40px rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 20px var(--accent-soft),
+              0 0 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--accent-soft);
 }
 body.dark-mode .bg-gray-50 { background: #0a0a0a !important; }
 body.dark-mode .bg-gray-100 { 
@@ -57,19 +63,19 @@ body.dark-mode .border-gray-300 { border-color: #4a4a4a !important; }
 
 /* Purple accent with subtle glow */
 body.dark-mode .bg-purple-600 { 
-  background: #8b5cf6 !important;
-  box-shadow: 0 0 30px rgba(139, 92, 246, 0.4),
-              0 0 60px rgba(139, 92, 246, 0.2);
+  background: var(--accent) !important;
+  box-shadow: 0 0 30px var(--accent-soft),
+              0 0 60px rgba(0, 0, 0, 0.2);
 }
-body.dark-mode .text-purple-600 { color: #a78bfa !important; }
+body.dark-mode .text-purple-600 { color: var(--accent) !important; }
 body.dark-mode .bg-purple-50 { 
-  background: #1a1425 !important;
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+  background: #111016 !important;
+  border: 1px solid var(--accent-soft);
+  box-shadow: 0 0 15px var(--accent-soft);
 }
-body.dark-mode .text-purple-700 { color: #a78bfa !important; }
-body.dark-mode .border-purple-200 { border-color: rgba(139, 92, 246, 0.3) !important; }
-body.dark-mode .border-purple-400 { border-color: #8b5cf6 !important; }
+body.dark-mode .text-purple-700 { color: var(--accent) !important; }
+body.dark-mode .border-purple-200 { border-color: var(--accent-soft) !important; }
+body.dark-mode .border-purple-400 { border-color: var(--accent) !important; }
 
 /* Dark mode for motivational quotes */
 body.dark-mode .dark-mode-quote-text { color: #ffffff !important; }
@@ -133,8 +139,8 @@ body.dark-mode .bg-orange-600 {
 
 /* Button glow in dark mode */
 body.dark-mode button.bg-purple-600 {
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4),
-              0 0 40px rgba(139, 92, 246, 0.2);
+  box-shadow: 0 4px 20px var(--accent-soft),
+              0 0 40px rgba(0, 0, 0, 0.25);
 }
 
 /* Cardio tiles in dark mode */
@@ -166,6 +172,12 @@ body.dark-mode .shadow-2xl { box-shadow: 0 0 30px rgba(139, 92, 246, 0.25); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+.bg-purple-600 { background: var(--accent) !important; }
+.text-purple-600 { color: var(--accent) !important; }
+.border-purple-200 { border-color: var(--accent-soft) !important; }
+.border-purple-400 { border-color: var(--accent) !important; }
+.bg-purple-50 { background: rgba(139, 92, 246, 0.05) !important; }
+
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes expandHeight { from { max-height: 0; opacity: 0; } to { max-height: 2000px; opacity: 1; } }
@@ -188,13 +200,40 @@ input[type="number"] { -moz-appearance: textfield; }
   bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
-  background: #7c3aed;
+  background: var(--accent);
   color: white;
   padding: 12px 20px;
   border-radius: 8px;
   z-index: 1000;
   animation: slideUp 0.2s ease-out;
   max-width: 90%;
+}
+
+.accent-pill {
+  border: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.accent-pill.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.exercise-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.tile:active {
+  transform: scale(0.98);
 }
 
   
