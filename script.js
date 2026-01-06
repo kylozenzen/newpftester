@@ -2,17 +2,37 @@ const { useState, useEffect, useMemo, useRef } = React;
 
     // ========== PWA SETUP ==========
     // Create and inject manifest
+    const ICON_SVG = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+      <rect width="200" height="200" rx="40" fill="%238b5cf6" />
+      <rect x="10" y="10" width="180" height="180" rx="36" fill="url(%23g1)" />
+      <defs>
+        <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="%239b6dff"/>
+          <stop offset="100%" stop-color="%237b3fe0"/>
+        </linearGradient>
+      </defs>
+      <text x="50%" y="56%" text-anchor="middle" fill="white" font-size="76" font-family="Inter, system-ui, sans-serif" font-weight="900">P</text>
+      <text x="50%" y="76%" text-anchor="middle" fill="white" font-size="64" font-family="Inter, system-ui, sans-serif" font-weight="900">S</text>
+    </svg>`);
+
+    const ICON_DATA = `data:image/svg+xml,${ICON_SVG}`;
+
     const MANIFEST = {
       "name": "Planet Strength",
-      "short_name": "PlanetStr",
-      "description": "Track your strength progress",
+      "short_name": "Planet Strength",
+      "description": "Track your strength and cardio fast.",
       "start_url": "./",
       "display": "standalone",
-      "background_color": "#7e22ce",
-      "theme_color": "#7e22ce",
+      "background_color": "#0a0a0a",
+      "theme_color": "#8b5cf6",
       "orientation": "portrait",
       "icons": [{
-        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%237e22ce' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='white'%3E💪%3C/text%3E%3C/svg%3E",
+        "src": ICON_DATA,
+        "sizes": "192x192",
+        "type": "image/svg+xml",
+        "purpose": "any maskable"
+      }, {
+        "src": ICON_DATA,
         "sizes": "512x512",
         "type": "image/svg+xml",
         "purpose": "any maskable"
@@ -23,6 +43,10 @@ const { useState, useEffect, useMemo, useRef } = React;
     // Some hosts/templates may omit the placeholder link; guard to avoid hard crashes.
     const manifestLink = document.getElementById('manifest-placeholder');
     if (manifestLink) manifestLink.setAttribute('href', manifestURL);
+    const iconLink = document.getElementById('app-icon');
+    if (iconLink) iconLink.setAttribute('href', ICON_DATA);
+    const appleIcon = document.getElementById('apple-icon');
+    if (appleIcon) appleIcon.setAttribute('href', ICON_DATA);
 
     // Register service worker
     // Register service worker only on supported origins (not file://)
@@ -817,6 +841,7 @@ const motivationalQuotes = [
 
     const STORAGE_VERSION = 3;
     const STORAGE_KEY = 'ps_v3_meta';
+    const ONBOARDING_KEY = 'ps_onboarding_complete';
 
     const uniqueDayKeysFromHistory = (history, cardioHistory = {}, restDays = [], dayEntries = null) => {
       if (dayEntries && Object.keys(dayEntries).length > 0) {
@@ -1034,82 +1059,104 @@ const motivationalQuotes = [
       </div>
     );
 
-    // ========== ONBOARDING ==========
-// Old onboarding (simple): name + avatar + where you train.
-// Everything else (weight, age, goals, etc.) can be added later in Profile.
+    const ToggleRow = ({ icon, title, subtitle, enabled, onToggle }) => (
+      <button
+        onClick={() => onToggle(!enabled)}
+        className="w-full flex items-center justify-between py-2"
+      >
+        <div className="flex items-center gap-3 text-left">
+          <Icon name={icon} className="w-5 h-5 text-purple-600" />
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">{title}</div>
+            {subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
+          </div>
+        </div>
+        <div className={`w-12 h-6 rounded-full transition-colors ${enabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
+          <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform m-0.5 ${enabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+        </div>
+      </button>
+    );
 
-const ProfileSetup = ({ profile, setProfile, onComplete }) => {
-  const canStart = (profile.username || '').trim().length > 0 && (profile.gymType || '').trim().length > 0;
+    // ========== ONBOARDING ==========
+// Intro + onboarding flow
+const IntroSlide = ({ title, body, onNext, onSkip, isLast }) => (
+  <div className="flex flex-col h-full p-6 text-center">
+    <div className="flex-1 flex flex-col justify-center gap-4">
+      <div className="text-5xl">🏋️‍♂️</div>
+      <h1 className="text-2xl font-black text-gray-900">{title}</h1>
+      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">{body}</p>
+    </div>
+    <div className="flex items-center justify-between gap-3 mt-auto">
+      <button onClick={onSkip} className="text-sm font-bold text-gray-500">Skip</button>
+      <button onClick={onNext} className="flex-1 py-3 rounded-2xl bg-purple-600 text-white font-bold">{isLast ? 'Next' : 'Next'}</button>
+    </div>
+  </div>
+);
+
+const OnboardingForm = ({ profile, setProfile, onComplete }) => {
+  const canStart = profile.username && profile.avatar && profile.workoutLocation;
+  const locationOptions = [
+    { id: 'gym', label: 'Gym', detail: 'Commercial gym or studio', gymType: 'commercial' },
+    { id: 'home', label: 'Home', detail: 'Garage, apartment, or backyard', gymType: 'home' },
+    { id: 'other', label: 'Other', detail: 'Travel or mixed', gymType: 'commercial' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="bg-white px-6 pt-8 pb-6 border-b border-gray-100">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Setup</div>
-          <h1 className="text-2xl font-black text-gray-900 mt-1">Let’s get you logging</h1>
-          <p className="text-sm text-gray-600 mt-2">Just the essentials. You can add the rest later.</p>
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Onboarding</div>
+          <h1 className="text-2xl font-black text-gray-900 mt-1">Finish setup</h1>
+          <p className="text-sm text-gray-600 mt-2">Name, emoji, and where you train.</p>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-5">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-5">
-              <div className="relative flex-shrink-0">
-                <div className="w-20 h-20 bg-purple-50 rounded-2xl flex items-center justify-center text-4xl">
-                  {profile.avatar}
-                </div>
-                <select
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  value={profile.avatar}
-                  onChange={(e) => setProfile({ ...profile, avatar: e.target.value })}
-                  aria-label="Choose avatar"
-                >
-                  {AVATARS.map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xs shadow-md">✎</div>
-              </div>
-
-              <div className="flex-1">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 block">Your Name</label>
-                <input
-                  type="text"
-                  value={profile.username}
-                  onChange={(e) => setProfile({ ...profile, username: e.target.value })}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:border-purple-400 focus:bg-white transition-all"
-                  placeholder="Ben, Darth Swole-der, etc."
-                  autoFocus
-                />
-              </div>
-            </div>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 block">Name</label>
+            <input
+              type="text"
+              value={profile.username}
+              onChange={(e) => setProfile({ ...profile, username: e.target.value })}
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:border-purple-400 focus:bg-white transition-all"
+              placeholder="Your name"
+            />
           </div>
 
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Where do you train?</label>
-            <div className="space-y-3">
-              {Object.entries(GYM_TYPES).map(([key, gym]) => (
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Pick an emoji</label>
+            <div className="grid grid-cols-5 gap-2">
+              {AVATARS.map((a) => (
                 <button
-                  key={key}
-                  onClick={() => setProfile({ ...profile, gymType: key })}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                    profile.gymType === key ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
+                  key={a}
+                  onClick={() => setProfile({ ...profile, avatar: a })}
+                  className={`p-3 rounded-xl text-2xl ${profile.avatar === a ? 'bg-purple-50 border-2 border-purple-400' : 'bg-gray-50 border border-gray-200'}`}
                 >
-                  <div className="text-2xl">{gym.emoji}</div>
-                  <div className="flex-1">
-                    <div className={`font-bold ${profile.gymType === key ? 'text-purple-700' : 'text-gray-900'}`}>{gym.label}</div>
-                    <div className="text-xs text-gray-500 mt-1">{gym.desc}</div>
-                  </div>
-                  {profile.gymType === key && <Icon name="Check" className="w-5 h-5 text-purple-600" />}
+                  {a}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <p className="text-sm text-gray-700 leading-relaxed">
-              <strong className="text-blue-700">Tip:</strong> Add weight/experience later if you want targets and strength scoring. If you don’t, you can turn insights off in Settings.
-            </p>
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Where are you working out?</label>
+            <div className="space-y-2">
+              {locationOptions.map((loc) => (
+                <button
+                  key={loc.id}
+                  onClick={() => setProfile({ ...profile, workoutLocation: loc.id, gymType: loc.gymType })}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
+                    profile.workoutLocation === loc.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-2xl">{loc.id === 'gym' ? '🏋️' : loc.id === 'home' ? '🏠' : '🧳'}</div>
+                  <div className="flex-1">
+                    <div className={`font-bold ${profile.workoutLocation === loc.id ? 'text-purple-700' : 'text-gray-900'}`}>{loc.label}</div>
+                    <div className="text-xs text-gray-500 mt-1">{loc.detail}</div>
+                  </div>
+                  {profile.workoutLocation === loc.id && <Icon name="Check" className="w-5 h-5 text-purple-600" />}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1122,11 +1169,42 @@ const ProfileSetup = ({ profile, setProfile, onComplete }) => {
             canStart ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
           }`}
         >
-          Start Logging 🚀
+          Start Tracking
         </button>
       </div>
     </div>
   );
+};
+
+const OnboardingFlow = ({ profile, setProfile, onFinish }) => {
+  const [step, setStep] = useState(0);
+  const slides = [
+    {
+      title: 'A workout tracker that stays out of your way',
+      body: 'Planet Strength is simple.\nLog strength and cardio fast.\nSee your progress over time.\nNo programs. No guilt. No noise.',
+    },
+    {
+      title: 'Progress is you vs. you',
+      body: 'Add a rep. Add a little weight.\nOr just show up again.\nInsights are optional. Tracking always works.',
+    },
+  ];
+
+  if (step < slides.length) {
+    const slide = slides[step];
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <IntroSlide
+          title={slide.title}
+          body={slide.body}
+          onSkip={() => setStep(slides.length)}
+          onNext={() => setStep(step + 1)}
+          isLast={step === slides.length - 1}
+        />
+      </div>
+    );
+  }
+
+  return <OnboardingForm profile={profile} setProfile={setProfile} onComplete={onFinish} />;
 };
 
 // ========== CALCULATIONS ==========
@@ -1138,36 +1216,21 @@ const ProfileSetup = ({ profile, setProfile, onComplete }) => {
       return best || null;
     };
 
-    const getStrongWeightForEquipment = (profile, equipId) => {
+    const getStrongWeightForEquipment = (_profile, equipId, sessions = []) => {
+      const best = getBestForEquipment(sessions);
+      if (best) return best;
       const eq = EQUIPMENT_DB[equipId];
-      const advancedIdx = 3;
-      // Removed activity multiplier - science says it's not relevant for strength standards
-      
-      let w = (profile.weight || 0) * (eq.multipliers?.[profile.gender]?.[advancedIdx] || 0) * (eq.ratio || 1);
-      
-      if (eq.type === 'machine' && eq.stackCap) w = Math.min(w, eq.stackCap);
-      
-      return clampTo5(w || 10);
+      const starter = eq?.tags?.includes('Legs') ? 45 : 15;
+      return clampTo5(starter);
     };
 
-    const getNextTarget = (profile, equipId, best) => {
+    const getNextTarget = (_profile, equipId, best) => {
       const eq = EQUIPMENT_DB[equipId];
-      
-      if (best) {
-        const increment = eq.tags.includes('Legs') ? 10 : 5;
-        return clampTo5(best + increment);
-      }
-      
-      const expIdx = EXPERIENCE_LEVELS.findIndex(e => e.label === profile.experience);
-      // Removed activity multiplier - science says it's not relevant for strength standards
-      let w = (profile.weight || 0) * (eq.multipliers?.[profile.gender]?.[expIdx] || 0) * (eq.ratio || 1);
-      
-      if (eq.type === 'machine' && eq.stackCap) w = Math.min(w, eq.stackCap);
-      
-      return clampTo5(w || 10);
+      const increment = eq?.tags?.includes('Legs') ? 10 : 5;
+      return clampTo5((best || getStrongWeightForEquipment({}, equipId, [])) + increment);
     };
 
-    const computeStrengthScore = (profile, history) => {
+    const computeStrengthScore = (_profile, history) => {
       const ids = Object.keys(EQUIPMENT_DB);
       const logged = ids.filter(id => (history[id] || []).length > 0);
 
@@ -1176,14 +1239,20 @@ const ProfileSetup = ({ profile, setProfile, onComplete }) => {
       }
 
       const ratios = logged.map(id => {
-        const best = getBestForEquipment(history[id] || []);
-        const strong = getStrongWeightForEquipment(profile, id);
-        return best ? Math.min(1, best / strong) : 0;
+        const sessions = history[id] || [];
+        if (sessions.length === 0) return 0;
+        const first = sessions[0];
+        const best = getBestForEquipment(sessions);
+        const firstBest = getBestForEquipment([first]);
+        if (!firstBest || !best) return 0.3;
+        const improvement = Math.max(0, best - firstBest);
+        const pct = Math.min(1, (improvement / (firstBest || 1)) * 0.5 + 0.5);
+        return pct;
       });
 
       const avg = ratios.reduce((a,b)=>a+b,0) / ratios.length;
       const coverage = logged.length / ids.length;
-      const score01 = (avg * 0.8) + (coverage * 0.2);
+      const score01 = (avg * 0.7) + (coverage * 0.3);
       const score = Math.round(score01 * 100);
 
       return { score, avgPct: Math.round(avg*100), coveragePct: Math.round(coverage*100), loggedCount: logged.length, total: ids.length };
@@ -1316,9 +1385,9 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
   );
 };
 
-const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, generatedWorkout, onRegenerateGeneratedWorkout, onSwapGeneratedExercise, onStartGeneratedWorkout, onLogRestDay, restDayLogged, hasWorkoutToday }) => {
+const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, generatedWorkout, onRegenerateGeneratedWorkout, onSwapGeneratedExercise, onStartGeneratedWorkout, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedGeneratedDate, setDismissedGeneratedDate }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapIndex, setSwapIndex] = useState(null);
 
   const gymType = GYM_TYPES[profile.gymType];
@@ -1336,6 +1405,8 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
 
   const filteredPinned = pinnedExercises.filter(id => availableEquipment.includes(id));
   const filteredRecents = recentExercises.filter(id => availableEquipment.includes(id)).slice(0, 12);
+  const todayKey = toDayKey(new Date());
+  const generatedHidden = dismissedGeneratedDate === todayKey;
 
   const searchResults = useMemo(() => {
     const pool = availableEquipment;
@@ -1349,6 +1420,10 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
     setPinnedExercises(updated);
     setSettings(prev => ({ ...(prev || {}), pinnedExercises: updated }));
   };
+
+  useEffect(() => {
+    setLibraryVisible(settings.showAllExercises);
+  }, [settings.showAllExercises]);
 
   const renderExerciseRow = (id, actionLabel = 'Log') => {
     const eq = EQUIPMENT_DB[id];
@@ -1377,6 +1452,32 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
           </button>
           <div className="text-purple-600 font-semibold text-sm">{actionLabel}</div>
         </div>
+      </button>
+    );
+  };
+
+  const renderExerciseTile = (id) => {
+    const eq = EQUIPMENT_DB[id];
+    if (!eq) return null;
+    const pinned = pinnedExercises.includes(id);
+    const typeIcon = eq.type === 'machine' ? '⚙️' : eq.type === 'dumbbell' ? '🏋️' : '🏋️‍♂️';
+    return (
+      <button
+        key={id}
+        onClick={() => onEquipmentSelect(id)}
+        className="tile text-left active:scale-[0.98] transition"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-lg">{typeIcon}</div>
+          <button
+            onClick={(e) => { e.stopPropagation(); togglePin(id); }}
+            className={`px-2 py-1 rounded-full text-[11px] font-bold ${pinned ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}
+          >
+            {pinned ? 'Pinned' : 'Pin'}
+          </button>
+        </div>
+        <div className="font-bold text-gray-900 text-sm leading-tight">{eq.name}</div>
+        <div className="text-[11px] text-gray-500">{eq.target}</div>
       </button>
     );
   };
@@ -1415,9 +1516,9 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
           </div>
-          {!showLibrary && (
+          {!libraryVisible && (
             <button
-              onClick={() => setShowLibrary(true)}
+              onClick={() => setLibraryVisible(true)}
               className="mt-2 text-xs font-bold text-purple-700 underline"
             >
               Browse full library
@@ -1427,14 +1528,17 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
       </div>
 
       <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4">
-        {generatedWorkout && (
+        {generatedWorkout && !generatedHidden && (
           <Card className="space-y-3 border-purple-200 bg-purple-50">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs font-bold text-purple-600 uppercase">Generated</div>
                 <div className="text-lg font-black text-gray-900">{generatedWorkout.label}</div>
               </div>
-              <button onClick={onRegenerateGeneratedWorkout} className="text-sm font-bold text-purple-700">Regenerate</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setDismissedGeneratedDate(todayKey); }} className="text-xs font-bold text-gray-500">Hide for today</button>
+                <button onClick={onRegenerateGeneratedWorkout} className="text-sm font-bold text-purple-700">Regenerate</button>
+              </div>
             </div>
             <div className="space-y-2">
               {generatedWorkout.exercises.map((id, idx) => {
@@ -1463,18 +1567,26 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
             </button>
           </Card>
         )}
-
-        {filteredPinned.length > 0 && (
-          <Card className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-bold text-gray-500 uppercase">Pinned Exercises</div>
-              <div className="text-xs text-gray-400">Tap to log</div>
-            </div>
-            <div className="space-y-2">
-              {filteredPinned.map(id => renderExerciseRow(id, 'Log'))}
-            </div>
+        {generatedWorkout && generatedHidden && (
+          <Card className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">Today’s workout hidden</div>
+            <button onClick={() => setDismissedGeneratedDate(null)} className="text-purple-700 font-bold text-sm">Show</button>
           </Card>
         )}
+
+        <Card className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-gray-500 uppercase">Pinned Exercises</div>
+            <div className="text-xs text-gray-400">Tap to log</div>
+          </div>
+          {filteredPinned.length === 0 ? (
+            <div className="text-xs text-gray-500">Pin your go-tos for quick access.</div>
+          ) : (
+            <div className="exercise-grid">
+              {filteredPinned.map(renderExerciseTile)}
+            </div>
+          )}
+        </Card>
 
         {filteredRecents.length > 0 && (
           <Card className="space-y-2">
@@ -1497,14 +1609,14 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
           </Card>
         )}
 
-        {showLibrary && (
+        {libraryVisible && (
           <Card className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold text-gray-500 uppercase">Full Library</div>
-              <button onClick={() => setShowLibrary(false)} className="text-xs text-purple-700 font-bold">Hide</button>
+              <button onClick={() => setLibraryVisible(false)} className="text-xs text-purple-700 font-bold">Hide</button>
             </div>
-            <div className="space-y-2">
-              {availableEquipment.map(id => renderExerciseRow(id, 'Log'))}
+            <div className="exercise-grid">
+              {availableEquipment.map(renderExerciseTile)}
             </div>
           </Card>
         )}
@@ -1683,7 +1795,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const latestDraftRef = useRef({ loggedSets: [], anchorWeight: '', anchorReps: '', anchorAdjusted: false, note: '' });
 
       const best = useMemo(() => getBestForEquipment(sessions), [sessions]);
-      const strongWeight = useMemo(() => getStrongWeightForEquipment(profile, id), [profile, id]);
       const nextTarget = useMemo(() => getNextTarget(profile, id, best), [profile, id, best]);
       const sessionNumber = sessions.length + 1;
 
@@ -1878,8 +1989,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         setAnchorAdjusted(false);
       };
 
-      const percentToStrong = best ? Math.min(100, Math.round((best / strongWeight) * 100)) : 0;
-
       const getPlateLoadingForSet = (weight) => {
         if (eq.type !== 'barbell' || !weight) return null;
         return calculatePlateLoading(Number(weight), profile.barWeight || 45);
@@ -1929,41 +2038,31 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                 {activeTab === 'workout' ? (
                   <>
                     {insightsEnabled && (
-                    <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4">
-                                          <div className="flex items-center justify-between">
-                                            <div>
-                                              <div className="text-xs font-bold text-purple-600 uppercase">Your Best</div>
-                                              <div className="text-2xl font-black text-gray-900">{best ? `${best} lbs` : '—'}</div>
-                                              {profile.weight > 0 && (
-                                                <div className="text-xs text-gray-500">Strong level: <span className="font-bold">{strongWeight} lbs</span></div>
-                                              )}
-                                            </div>
-                                            {profile.weight > 0 && (
-                                              <div className="text-right">
-                                                <div className="text-xs font-bold text-gray-500 uppercase">Progress</div>
-                                                <div className="text-2xl font-black text-gray-700">{percentToStrong}%</div>
-                                              </div>
-                                            )}
-                                          </div>
-                                          {profile.weight > 0 && (
-                                            <div className="mt-3 h-2 bg-white rounded-full overflow-hidden">
-                                              <div className="h-full bg-purple-600 rounded-full" style={{ width: `${percentToStrong}%` }} />
-                                            </div>
-                                          )}
-                                          
-                                          {eq.type === 'barbell' && (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowPlateCalc(true);
-                                              }}
-                                              className="w-full mt-3 py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border-2 border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                            >
-                                              🏋️ Plate Calculator
-                                            </button>
-                                          )}
-                                        </div>
-                    
+                      <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs font-bold text-purple-600 uppercase">Personal best</div>
+                            <div className="text-2xl font-black text-gray-900">{best ? `${best} lbs` : '—'}</div>
+                          </div>
+                          {lastSessionInfo && (
+                            <div className="text-right text-xs text-gray-600">
+                              <div className="font-bold text-gray-900">Last time</div>
+                              <div>{lastSessionInfo.weight} lb × {lastSessionInfo.reps}</div>
+                            </div>
+                          )}
+                        </div>
+                        {eq.type === 'barbell' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowPlateCalc(true);
+                            }}
+                            className="w-full mt-1 py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border-2 border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                          >
+                            🏋️ Plate Calculator
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
@@ -2557,26 +2656,24 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                 <Card>
                   <h3 className="font-bold text-gray-900 mb-3">Exercise Progress</h3>
                   <div className="space-y-2">
-                    {allEquipment.filter(id => {
-                      const best = getBestForEquipment(history[id] || []);
-                      return best && best > 0;
-                    }).slice(0, 5).map(id => {
+                    {allEquipment.filter(id => (history[id] || []).length > 0).slice(0, 5).map(id => {
                       const eq = EQUIPMENT_DB[id];
-                      const best = getBestForEquipment(history[id] || []);
-                      const strong = profile.weight > 0 ? getStrongWeightForEquipment(profile, id) : null;
-                      const pct = best && strong ? Math.min(100, Math.round((best / strong) * 100)) : 0;
-                      
+                      const sessions = history[id] || [];
+                      const best = getBestForEquipment(sessions) || 0;
+                      const first = getBestForEquipment([sessions[0]]) || 1;
+                      const pct = Math.min(100, Math.round(((best - first) / first) * 100));
+                      const bar = Math.min(100, Math.max(10, 50 + pct));
                       return (
                         <div key={id} onClick={() => { setSelectedEquipment(id); setShowHistory(false); }} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:border-purple-200 transition-all">
                           <div className="flex items-center gap-2">
                             <div className="text-lg">{eq.type === 'machine' ? '⚙️' : eq.type === 'dumbbell' ? '🏋️' : '🏋️‍♂️'}</div>
                             <div>
                               <div className="text-xs font-bold text-gray-900">{eq.name}</div>
-                              <div className="text-[10px] text-gray-500">{best} lbs • {pct}% to goal</div>
+                              <div className="text-[10px] text-gray-500">Best: {best} lbs {pct > 0 ? `(+${pct}%)` : ''}</div>
                             </div>
                           </div>
-                          <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-purple-600 rounded-full" style={{ width: `${pct}%` }}></div>
+                          <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-purple-600 rounded-full" style={{ width: `${bar}%` }}></div>
                           </div>
                         </div>
                       );
@@ -2622,575 +2719,205 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     };
 
     // ========== PROFILE TAB ==========
-    const ProfileView = ({ profile, setProfile, settings, setSettings, onReset, onExportData, onImportData, streakObj, workoutCount = 0, restDayCount = 0, onViewAnalytics }) => {
-      const [showLearn, setShowLearn] = useState(false);
-      const [expandedTopic, setExpandedTopic] = useState(null);
-      const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-      const [showUpdateProfile, setShowUpdateProfile] = useState(false);
+    const ProfileView = ({ profile, setProfile, settings, setSettings, onReset, onResetOnboarding, onExportData, onImportData, streakObj, workoutCount = 0, restDayCount = 0, onViewAnalytics }) => {
+      const [editing, setEditing] = useState(false);
+      const [draft, setDraft] = useState(profile);
 
-      const avatarOptions = ['🦁','🐻','🦅','🐺','🦈','🦖','🐯','🦍','🐉','⚡','🔥','💪','🎯','🚀'];
+      useEffect(() => setDraft(profile), [profile]);
 
-      const activityLevel = ACTIVITY_LEVELS.find(a => a.label === profile.activityLevel);
-      const goalMeta = GOALS.find(g => g.id === profile.goal);
-      const gymType = GYM_TYPES[profile.gymType];
+      const saveProfile = () => {
+        if (!draft.username || !draft.avatar || !draft.workoutLocation) return;
+        setProfile({ ...profile, ...draft });
+        setEditing(false);
+      };
 
-      const learnTopics = [
-        {
-          id: 'rest-days',
-          title: 'Why Rest Days Matter',
-          emoji: '😴',
-          short: 'Muscles grow when you rest',
-          content: 'Your muscles do not grow in the gym - they grow during rest. Training creates micro-tears in muscle fibers. Rest days allow repair and growth. Aim for 1-2 full rest days per week. Sleep 7-9 hours. Overtraining leads to injury, burnout, and slower progress.'
-        },
-        {
-          id: 'fat-loss',
-          title: 'How Fat Loss Really Works',
-          emoji: '🔥',
-          short: 'The truth about losing fat',
-          content: 'Fat loss requires a calorie deficit - eating less than you burn. There are no shortcuts. Strength training preserves muscle while losing fat. Expect 0.5-1% bodyweight loss per week. Faster = more muscle loss. Focus on sustainable habits, not crash diets. Lift weights, eat enough protein, be patient.'
-        },
-        {
-          id: 'muscle-gain',
-          title: 'Building Muscle Takes Time',
-          emoji: '💪',
-          short: 'Realistic expectations',
-          content: 'Natural muscle gain is slow. Beginners: 1-2 lbs/month. Intermediate: 0.5-1 lb/month. Advanced: 0.25-0.5 lb/month. You need a small calorie surplus and high protein (0.8-1g per lb bodyweight). Progressive overload is essential. Be consistent for months, not weeks. Trust the process.'
-        },
-        {
-          id: 'progressive-overload',
-          title: 'Progressive Overload',
-          emoji: '📈',
-          short: 'The foundation of getting stronger',
-          content: 'Progressive overload means gradually increasing the stress on your muscles over time. Add weight or reps each session. Even small increases (2.5-5 lbs) add up to massive gains over months.'
-        },
-        {
-          id: 'push-pull-legs',
-          title: 'Push/Pull/Legs Split',
-          emoji: '🔄',
-          short: 'How we organize workouts',
-          content: 'Push: Chest, shoulders, triceps (pressing movements). Pull: Back, biceps (pulling movements). Legs: Everything below the waist. This split ensures balanced development and adequate recovery.'
-        },
-        {
-          id: 'targets',
-          title: 'How We Calculate Targets',
-          emoji: '🎯',
-          short: 'Personalized to your body',
-          content: 'Targets are based on your body weight, gender, and experience level. "Strong" weight = what an experienced lifter your size typically lifts. These are realistic goals based on science, not elite performance. As you log workouts, your targets automatically increase.'
-        },
-        {
-          id: 'rep-ranges',
-          title: 'Rep Ranges by Goal',
-          emoji: '🔢',
-          short: 'Different goals, different reps',
-          content: 'Strength: 5-8 reps with heavy weight. Muscle building: 8-12 reps. Endurance/fat loss: 12-15+ reps. All ranges build strength, but emphasis shifts.'
-        },
-        {
-          id: 'when-to-increase',
-          title: 'When to Add Weight',
-          emoji: '⬆️',
-          short: 'Progress safely',
-          content: 'Increase weight when all sets feel "easy" (2+ reps left in the tank). Small, consistent jumps beat big jumps. Better to add 5 lbs you can handle than 10 lbs you struggle with.'
-        },
-        {
-          id: 'equipment-types',
-          title: 'Machines vs Free Weights',
-          emoji: '⚖️',
-          short: 'Each has benefits',
-          content: 'Machines: Safer, easier to learn, great for isolation. Dumbbells: Build stabilizers, natural movement. Barbells: Move the most weight, best for strength. Use what you have access to - consistency matters more than equipment.'
-        }
+      const accentOptions = [
+        { id: 'purple', label: 'Purple', color: '#8B5CF6' },
+        { id: 'red', label: 'Dark Red', color: '#B91C1C' },
+        { id: 'gold', label: 'Gold', color: '#D97706' },
+      ];
+
+      const locations = [
+        { id: 'gym', label: 'Gym', detail: 'Commercial or local gym', gymType: 'commercial' },
+        { id: 'home', label: 'Home', detail: 'Garage or apartment setup', gymType: 'home' },
+        { id: 'other', label: 'Other', detail: 'Hotel, park, travel', gymType: 'commercial' },
       ];
 
       return (
         <div className="flex flex-col h-full bg-gray-50">
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-            <h1 className="text-2xl font-black text-gray-900 p-4 py-5">Profile</h1>
+            <h1 className="text-2xl font-black text-gray-900 p-4 py-5">Profile & Settings</h1>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 pb-24">
-            <Card className="mb-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-              <div className="flex items-center justify-between">
+          <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
                 <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
+                  <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
+                  <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
+                </div>
+                <div className="ml-auto text-right">
                   <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
-                  <div className="text-2xl font-black text-purple-700">{streakObj?.current || 0} days</div>
-                  <div className="text-[11px] text-gray-500">Best: {streakObj?.best || 0}</div>
+                  <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
+                  <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold text-gray-500 uppercase">Workouts</div>
-                  <div className="text-2xl font-black text-gray-900">{workoutCount}</div>
-                  <div className="text-[11px] text-gray-500">Rest days: {restDayCount}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
+                <div className="bg-white rounded-xl p-2 border border-gray-100">
+                  <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
+                  <div>Workouts logged</div>
                 </div>
-              </div>{settings.insightsEnabled && (
-              <button
-                onClick={onViewAnalytics}
-                className="w-full mt-4 py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98] transition"
-              >
-                View Analytics
-              </button>
-            )}</Card>
-
-            <Card className="mb-6 text-center">
-              <button 
-                onClick={() => setShowAvatarPicker(!showAvatarPicker)} 
-                className="text-6xl mb-2 mx-auto active:scale-95 transition-transform"
-              >
-                {profile.avatar}
-              </button>
-              <div className="text-xs text-purple-600 font-semibold mb-3">Tap to change avatar</div>
-              
-              {showAvatarPicker && (
-                <div className="grid grid-cols-7 gap-2 mb-4 p-3 bg-purple-50 rounded-xl animate-expand">
-                  {avatarOptions.map(emoji => (
-                    <button
-                      key={emoji}
-                      onClick={() => {
-                        setProfile({...profile, avatar: emoji});
-                        setShowAvatarPicker(false);
-                      }}
-                      className={`text-3xl p-2 rounded-lg transition-all ${
-                        profile.avatar === emoji ? 'bg-purple-600 scale-110' : 'hover:bg-white active:scale-95'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                <div className="bg-white rounded-xl p-2 border border-gray-100">
+                  <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
+                  <div>Rest days</div>
                 </div>
-              )}
-              
-              <h2 className="text-xl font-bold text-gray-900">{profile.username}</h2>
-              <p className="text-sm text-gray-500">
-                {gymType?.label}
-                {profile.weight > 0 && ` • ${profile.weight} lbs`}
-                {profile.age > 0 && ` • ${profile.age} years`}
-              </p>
-
-              <div className="flex gap-2 justify-center mt-3 flex-wrap">
-                {profile.experience && (
-                  <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-bold">
-                    {profile.experience}
-                  </span>
-                )}
-                {activityLevel && (
-                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">
-                    {activityLevel.emoji} {profile.activityLevel}
-                  </span>
-                )}
-                {goalMeta && (
-                  <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-bold">
-                    {goalMeta.emoji} {goalMeta.label}
-                  </span>
-                )}
               </div>
             </Card>
 
-            {profile.weight === 0 && (
-              <Card className="mb-4 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="text-3xl">✨</div>
-                  <div>
-                    <h3 className="text-base font-bold text-orange-900 mb-1">Get Personalized Targets</h3>
-                    <p className="text-sm text-orange-700 leading-relaxed mb-2">
-                      Add your <strong>weight, gender, and experience</strong> to get custom strength targets tailored to your body.
-                    </p>
-                    <p className="text-xs text-orange-600 mb-3">
-                      Activity Level and Goal are optional - only set them if you want!
-                    </p>
+            <Card className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase">Workout</div>
+              <ToggleRow
+                icon="TrendingUp"
+                title="Insights"
+                subtitle="Show last time + small suggestions"
+                enabled={settings.insightsEnabled !== false}
+                onToggle={(next) => setSettings({ ...settings, insightsEnabled: next })}
+              />
+              <ToggleRow
+                icon="List"
+                title="Show All Exercises"
+                subtitle="Start with the full library open"
+                enabled={settings.showAllExercises}
+                onToggle={(next) => setSettings({ ...settings, showAllExercises: next })}
+              />
+            </Card>
+
+            <Card className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase">Appearance</div>
+              <ToggleRow
+                icon="Moon"
+                title="Dark Mode"
+                subtitle="Low-glare interface"
+                enabled={settings.darkMode}
+                onToggle={(next) => setSettings({ ...settings, darkMode: next })}
+              />
+              <div>
+                <div className="text-xs font-bold text-gray-500 uppercase mb-2">Dark mode accent</div>
+                <div className="flex gap-2">
+                  {accentOptions.map(opt => (
                     <button
-                      onClick={() => setShowUpdateProfile(true)}
-                      className="px-4 py-2 bg-orange-600 text-white font-bold rounded-lg text-sm active:scale-95 transition-all"
+                      key={opt.id}
+                      onClick={() => setSettings({ ...settings, darkAccent: opt.id })}
+                      className={`flex-1 accent-pill ${settings.darkAccent === opt.id ? 'active' : ''} rounded-xl p-2 flex items-center gap-2`}
                     >
-                      Complete Profile
+                      <span className="w-6 h-6 rounded-lg" style={{ background: opt.color }}></span>
+                      <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
                     </button>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            <Card className="mb-4">
-              <button 
-                onClick={() => setShowLearn(!showLearn)} 
-                className="w-full flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name="BookOpen" className="w-5 h-5 text-purple-600"/>
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm">Learn</div>
-                    <div className="text-xs text-gray-500">Training fundamentals</div>
-                  </div>
-                </div>
-                <Icon name="ChevronDown" className={`w-5 h-5 text-gray-400 transition-transform ${showLearn ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showLearn && (
-                <div className="mt-4 space-y-2 animate-expand">
-                  {learnTopics.map(topic => (
-                    <div key={topic.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                      <button
-                        onClick={() => setExpandedTopic(expandedTopic === topic.id ? null : topic.id)}
-                        className="w-full p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="text-2xl flex-shrink-0">{topic.emoji}</div>
-                        <div className="flex-1 text-left">
-                          <div className="font-bold text-gray-900 text-sm">{topic.title}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{topic.short}</div>
-                        </div>
-                        <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${expandedTopic === topic.id ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {expandedTopic === topic.id && (
-                        <div className="px-3 pb-3 animate-expand">
-                          <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-3 rounded-lg">
-                            {topic.content}
-                          </p>
-                        </div>
-                      )}
-                    </div>
                   ))}
                 </div>
-              )}
+              </div>
             </Card>
 
-            <h3 className={`text-xs font-bold uppercase mb-2 px-1 ${settings.darkMode ? "text-gray-400" : "text-gray-400"}`}>Quick Toggles</h3>
-
-            <Card className="mb-4">
+            <Card className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase">Analytics</div>
               <button
-  onClick={() => {
-    const next = !settings.insightsEnabled;
-    const updated = { ...settings, insightsEnabled: next };
-    if (!next) {
-      updated.showSuggestions = false;
-    }
-    setSettings(updated);
-  }}
-  className="w-full flex items-center justify-between py-2 border-b border-gray-100 pb-4 mb-4"
->
-  <div className="flex items-center gap-3">
-    <Icon name="TrendingUp" className="w-5 h-5 text-purple-600"/>
-    <div className="text-left">
-      <div className="font-semibold text-gray-900 text-sm">Insights</div>
-      <div className="text-xs text-gray-500">Show progress, targets, and advice</div>
-    </div>
-  </div>
-  <div className={`w-12 h-6 rounded-full transition-colors ${settings.insightsEnabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
-    <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform m-0.5 ${settings.insightsEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-  </div>
-</button>
-
-              <button
-                onClick={() => settings.insightsEnabled && setSettings({...settings, showSuggestions: !settings.showSuggestions})}
-                className="w-full flex items-center justify-between py-2 border-b border-gray-100 pb-4 mb-4"
+                onClick={onViewAnalytics}
+                className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98] transition"
               >
-                <div className="flex items-center gap-3">
-                  <Icon name="Lightbulb" className="w-5 h-5 text-purple-600"/>
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm">Smart Suggestions</div>
-                    <div className="text-xs text-gray-500">Show progression advice</div>
-                  </div>
-                </div>
-                <div className={`w-12 h-6 rounded-full transition-colors ${settings.showSuggestions ? 'bg-purple-600' : 'bg-gray-300'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform m-0.5 ${settings.showSuggestions ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => setSettings({...settings, darkMode: !settings.darkMode})}
-                className="w-full flex items-center justify-between py-2 border-b border-gray-100 pb-4 mb-4"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name="Moon" className="w-5 h-5 text-indigo-600"/>
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm">Dark Mode</div>
-                    <div className="text-xs text-gray-500">Neon-themed dark interface</div>
-                  </div>
-                </div>
-                <div className={`w-12 h-6 rounded-full transition-colors ${settings.darkMode ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform m-0.5 ${settings.darkMode ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => setSettings({...settings, showAllExercises: !settings.showAllExercises})}
-                className="w-full flex items-center justify-between py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name="List" className="w-5 h-5 text-purple-600"/>
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm">Show All Exercises</div>
-                    <div className="text-xs text-gray-500">Display all 50 exercises by default</div>
-                  </div>
-                </div>
-                <div className={`w-12 h-6 rounded-full transition-colors ${settings.showAllExercises ? 'bg-purple-600' : 'bg-gray-300'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform m-0.5 ${settings.showAllExercises ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                </div>
+                Open Analytics
               </button>
             </Card>
 
-            <Card className="mb-4">
-              <button 
-                onClick={() => setShowUpdateProfile(!showUpdateProfile)} 
-                className="w-full flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon name="User" className="w-5 h-5 text-purple-600"/>
-                  <div className="text-left">
-                    <div className="font-semibold text-gray-900 text-sm">Update Profile</div>
-                    <div className="text-xs text-gray-500">Weight, age, experience, goals</div>
-                  </div>
+            <Card className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Profile</div>
+                  <div className="text-sm text-gray-500">Edit name, emoji, and location</div>
                 </div>
-                <Icon name="ChevronDown" className={`w-5 h-5 text-gray-400 transition-transform ${showUpdateProfile ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showUpdateProfile && (
-                <div className="mt-4 space-y-4 animate-expand">
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
-                    <p className="text-xs text-blue-700 leading-relaxed">
-                      <strong className="font-bold">💡 How this works:</strong> Add your weight, gender, and experience to get personalized strength targets. Activity Level and Goal are optional - only set them if you want.
-                    </p>
-                  </div>
-                  
+                <button onClick={() => setEditing(!editing)} className="text-purple-600 font-bold text-sm">{editing ? 'Close' : 'Edit'}</button>
+              </div>
+              {editing && (
+                <div className="space-y-3 animate-expand">
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Weight (lbs)</label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Name</label>
                     <input
-                      type="number"
-                      className="w-full p-3 border border-gray-200 rounded-xl font-bold outline-none bg-white focus:border-purple-400 transition-colors"
-                      value={profile.weight || ''}
-                      onChange={e => setProfile({...profile, weight: Number(e.target.value)})}
-                      placeholder="Enter your weight"
+                      value={draft.username}
+                      onChange={(e) => setDraft({ ...draft, username: e.target.value })}
+                      className="w-full p-3 border border-gray-200 rounded-xl font-semibold"
+                      placeholder="Your name"
                     />
                   </div>
-
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Age</label>
-                    <input
-                      type="number"
-                      className="w-full p-3 border border-gray-200 rounded-xl font-bold outline-none bg-white focus:border-purple-400 transition-colors"
-                      value={profile.age || ''}
-                      onChange={e => setProfile({...profile, age: Number(e.target.value)})}
-                      placeholder="Your age"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Gender</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Male','Female'].map(g => (
+                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Emoji avatar</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {AVATARS.map(emoji => (
                         <button
-                          key={g}
-                          onClick={() => setProfile({...profile, gender: g})}
-                          className={`py-3 rounded-xl font-semibold border-2 transition-all ${
-                            profile.gender === g ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-400 bg-white'
-                          }`}
+                          key={emoji}
+                          onClick={() => setDraft({ ...draft, avatar: emoji })}
+                          className={`p-2 rounded-xl text-2xl ${draft.avatar === emoji ? 'bg-purple-50 border-2 border-purple-400' : 'bg-white border border-gray-200'}`}
                         >
-                          <span className="text-xl mr-2">{g === 'Male' ? '♂' : '♀'}</span>
-                          {g}
+                          {emoji}
                         </button>
                       ))}
                     </div>
                   </div>
-
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Experience</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {EXPERIENCE_LEVELS.map(l => (
-                        <button
-                          key={l.label}
-                          onClick={() => setProfile({...profile, experience: l.label})}
-                          className={`p-3 rounded-xl border-2 text-left transition-all ${
-                            profile.experience === l.label ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          <div className={`font-semibold text-sm ${profile.experience === l.label ? 'text-purple-700' : 'text-gray-700'}`}>
-                            {l.label}
-                          </div>
-                          <div className="text-xs text-gray-400">{l.desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">
-                      Activity Level <span className="text-[10px] text-gray-400 font-normal">(Optional)</span>
-                    </label>
+                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Where are you working out?</label>
                     <div className="space-y-2">
-                      <button
-                        onClick={() => setProfile({...profile, activityLevel: null})}
-                        className={`w-full p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                          profile.activityLevel === null ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <div className="text-xl flex-shrink-0">⏭️</div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-semibold text-sm ${profile.activityLevel === null ? 'text-purple-700' : 'text-gray-700'}`}>
-                            Skip for now
-                          </div>
-                          <div className="text-xs text-gray-400 truncate">You can set this later</div>
-                        </div>
-                      </button>
-                      {ACTIVITY_LEVELS.map(l => (
+                      {locations.map(loc => (
                         <button
-                          key={l.label}
-                          onClick={() => setProfile({...profile, activityLevel: l.label})}
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                            profile.activityLevel === l.label ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                          }`}
+                          key={loc.id}
+                          onClick={() => setDraft({ ...draft, workoutLocation: loc.id, gymType: loc.gymType })}
+                          className={`w-full p-3 rounded-xl border-2 text-left ${draft.workoutLocation === loc.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'}`}
                         >
-                          <div className="text-xl flex-shrink-0">{l.emoji}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className={`font-semibold text-sm ${profile.activityLevel === l.label ? 'text-purple-700' : 'text-gray-700'}`}>
-                              {l.label}
-                            </div>
-                            <div className="text-xs text-gray-400 truncate">{l.desc}</div>
-                          </div>
+                          <div className="font-bold text-sm text-gray-900">{loc.label}</div>
+                          <div className="text-xs text-gray-500">{loc.detail}</div>
                         </button>
                       ))}
                     </div>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">
-                      Goal <span className="text-[10px] text-gray-400 font-normal">(Optional)</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setProfile({...profile, goal: null})}
-                        className={`p-3 rounded-xl border-2 text-left transition-all col-span-2 ${
-                          profile.goal === null ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="text-lg">⏭️</div>
-                          <div className="flex-1">
-                            <div className={`text-sm font-black ${profile.goal === null ? 'text-purple-700' : 'text-gray-800'}`}>Skip for now</div>
-                            <div className="text-[11px] text-gray-500">You can set this later</div>
-                          </div>
-                        </div>
-                      </button>
-                      {GOALS.map(g => (
-                        <button
-                          key={g.id}
-                          onClick={() => setProfile({...profile, goal: g.id})}
-                          className={`p-3 rounded-xl border-2 text-left transition-all ${
-                            profile.goal === g.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          <div className="text-lg">{g.emoji}</div>
-                          <div className={`text-sm font-black ${profile.goal === g.id ? 'text-purple-700' : 'text-gray-800'}`}>{g.label}</div>
-                          <div className="text-[11px] text-gray-500">{g.desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Gym Type</label>
-                    <div className="space-y-2">
-                      {Object.entries(GYM_TYPES).map(([key, gym]) => (
-                        <button
-                          key={key}
-                          onClick={() => setProfile({...profile, gymType: key})}
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${
-                            profile.gymType === key ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          <div className="text-xl flex-shrink-0">{gym.emoji}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className={`font-semibold text-sm ${profile.gymType === key ? 'text-purple-700' : 'text-gray-700'}`}>
-                              {gym.label}
-                            </div>
-                            {gym.desc && <div className="text-xs text-gray-400 truncate">{gym.desc}</div>}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {GYM_TYPES[profile.gymType]?.barbells?.available && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Bar Weight</label>
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        {[45, 35, 25, 15].map(weight => (
-                          <button
-                            key={weight}
-                            onClick={() => setProfile({...profile, barWeight: weight})}
-                            className={`p-3 rounded-xl border-2 transition-all ${
-                              profile.barWeight === weight ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            <div className={`text-lg font-black ${profile.barWeight === weight ? 'text-purple-700' : 'text-gray-900'}`}>
-                              {weight} lbs
-                            </div>
-                            <div className="text-[10px] text-gray-500">
-                              {weight === 45 ? 'Standard' : weight === 35 ? 'Women\'s' : weight === 25 ? 'Training' : 'Light'}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      <input
-                        type="number"
-                        value={profile.barWeight || ''}
-                        onChange={e => setProfile({...profile, barWeight: Number(e.target.value)})}
-                        className="w-full p-3 border border-gray-200 rounded-xl font-bold outline-none bg-white focus:border-purple-400 transition-colors"
-                        placeholder="Custom bar weight"
-                      />
-                    </div>
-                  )}
+                  <button
+                    onClick={saveProfile}
+                    disabled={!draft.username || !draft.avatar || !draft.workoutLocation}
+                    className={`w-full py-3 rounded-xl font-bold text-white ${draft.username && draft.avatar && draft.workoutLocation ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                  >
+                    Save Profile
+                  </button>
                 </div>
               )}
             </Card>
 
-            <Card className="mb-4">
-              <details className="group">
-                <summary className="list-none cursor-pointer select-none">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Icon name="Settings" className="w-5 h-5 text-purple-600"/>
-                      <div className="text-left">
-                        <div className={`font-semibold text-sm ${settings.darkMode ? 'text-gray-100' : 'text-gray-900'}`}>More Settings</div>
-                        <div className={`text-xs ${settings.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Reset, recalculation, and advanced options</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`text-xs font-bold ${settings.darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Details</div>
-                      <Icon name="ChevronDown" className={`w-5 h-5 ${settings.darkMode ? 'text-gray-400' : 'text-gray-500'} transition-transform duration-200 group-open:rotate-180`}/>
-                    </div>
-                  </div>
-                </summary>
-
-                <div className="mt-4 space-y-3">
-                  {showUpdateProfile && profile.weight > 0 && (
-                    <button
-                      onClick={() => {
-                        // Force recalculation by updating a timestamp
-                        setProfile({...profile, lastRecalc: Date.now()});
-                      }}
-                      className={`w-full p-4 rounded-xl font-bold active:scale-95 transition-all shadow-md ${settings.darkMode ? 'bg-purple-600 text-white' : 'bg-purple-600 text-white'}`}
-                    >
-                      ♻️ Recalculate Strength Targets
-                    </button>
-                  )}
-
-                  <button
-                    onClick={onExportData}
-                    className={`w-full p-4 rounded-xl font-bold flex items-center justify-between transition-colors ${settings.darkMode ? 'bg-gray-900 border border-gray-700 text-blue-400 hover:bg-gray-800' : 'bg-white border border-gray-200 text-blue-600 hover:bg-blue-50'}`}
-                  >
-                    <span>💾 Export Data</span><Icon name="ChevronDown" className="w-4 h-4"/>
-                  </button>
-
-                  <button
-                    onClick={onImportData}
-                    className={`w-full p-4 rounded-xl font-bold flex items-center justify-between transition-colors ${settings.darkMode ? 'bg-gray-900 border border-gray-700 text-green-400 hover:bg-gray-800' : 'bg-white border border-gray-200 text-green-600 hover:bg-green-50'}`}
-                  >
-                    <span>📂 Import Data</span><Icon name="ChevronRight" className="w-4 h-4"/>
-                  </button>
-
-                  <button
-                    onClick={onReset}
-                    className={`w-full p-4 rounded-xl font-bold flex items-center justify-between transition-colors ${settings.darkMode ? 'bg-gray-900 border border-gray-700 text-red-400 hover:bg-gray-800' : 'bg-white border border-gray-200 text-red-600 hover:bg-red-50'}`}
-                  >
-                    <span>Reset All Data</span><Icon name="Trash" className="w-4 h-4"/>
-                  </button>
-                </div>
-              </details>
+            <Card className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
+              <button
+                onClick={onResetOnboarding}
+                className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold flex items-center justify-between"
+              >
+                <span>Reset onboarding</span>
+                <Icon name="RefreshCw" className="w-4 h-4 text-gray-500" />
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={onExportData}
+                  className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
+                >
+                  Export
+                </button>
+                <button
+                  onClick={onImportData}
+                  className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
+                >
+                  Import
+                </button>
+              </div>
+              <button
+                onClick={onReset}
+                className="w-full p-3 rounded-xl border border-red-200 text-red-700 font-bold bg-red-50"
+              >
+                Clear all data
+              </button>
             </Card>
           </div>
         </div>
@@ -3198,7 +2925,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     };
 
     // ========== CARDIO LOGGER ==========
-const CardioLogger = ({ type, onSave, onClose }) => {
+const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) => {
   const meta = CARDIO_TYPES[type] || { name: 'Cardio', emoji: '🏃', regularActivities: [], proMetrics: [] };
   const [activityId, setActivityId] = useState(meta.regularActivities?.[0]?.id || 'custom');
   const [duration, setDuration] = useState('');
@@ -3230,8 +2957,8 @@ const CardioLogger = ({ type, onSave, onClose }) => {
               <Icon name="ChevronLeft" className="w-6 h-6"/>
             </button>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{meta.emoji} {meta.name}</h2>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Log a cardio session</p>
+              <h2 className="text-lg font-bold text-gray-900">{meta.emoji} Log {meta.name}</h2>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Time is required, distance optional</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
@@ -3239,63 +2966,58 @@ const CardioLogger = ({ type, onSave, onClose }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-5 space-y-4">
-            {meta.regularActivities?.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
-                <div className="text-xs font-bold text-gray-500 uppercase mb-2">What did you do?</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {meta.regularActivities.map(a => (
-                    <button
-                      key={a.id}
-                      onClick={() => setActivityId(a.id)}
-                      className={`p-3 rounded-xl border-2 text-left transition-all ${
-                        activityId === a.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="text-xl">{a.emoji}</div>
-                        <div className="text-xs font-bold text-gray-900">{a.label}</div>
-                      </div>
-                    </button>
-                  ))}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {insightsEnabled && lastSession?.duration && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-sm text-purple-800">
+              Last time: {lastSession.duration} min
+            </div>
+          )}
+          <div className="bg-white border border-gray-200 rounded-2xl p-4">
+            <div className="text-xs font-bold text-gray-500 uppercase mb-2">Cardio Type</div>
+            <div className="grid grid-cols-2 gap-2">
+              {(meta.regularActivities || []).map(act => (
+                <button
+                  key={act.id}
+                  onClick={() => setActivityId(act.id)}
+                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    activityId === act.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-bold text-gray-900">{act.emoji} {act.label}</div>
+                </button>
+              ))}
+              <button
+                onClick={() => setActivityId('custom')}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${activityId === 'custom' ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+              >
+                <div className="text-xs font-bold text-gray-900">✏️ Custom</div>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <div className="text-xs font-bold text-gray-500 uppercase mb-2">Duration</div>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {[10, 20, 30].map(min => (
                   <button
-                    onClick={() => setActivityId('custom')}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      activityId === 'custom' ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    key={min}
+                    onClick={() => setDuration(String(min))}
+                    className={`p-3 rounded-xl border-2 text-center font-bold transition-all ${
+                      Number(duration) === min ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="text-xl">✍️</div>
-                      <div className="text-xs font-bold text-gray-900">Custom</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-4">
-              <div className="text-xs font-bold text-gray-500 uppercase mb-2">How long?</div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="Minutes"
-                  className="w-full text-xl font-black text-center p-3 border-2 border-purple-200 rounded-xl focus:border-purple-600 outline-none bg-white text-gray-900"
-                />
-              </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {[10, 15, 20, 30].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setDuration(String(m))}
-                    className="py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 active:scale-95"
-                  >
-                    {m}
+                    {min} min
                   </button>
                 ))}
               </div>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="Minutes"
+                className="w-full text-lg font-bold text-center p-3 border-2 border-gray-200 rounded-xl focus:border-purple-600 outline-none bg-white text-gray-900"
+              />
             </div>
 
             {(meta.proMetrics || []).includes('distance') && (
@@ -3308,7 +3030,7 @@ const CardioLogger = ({ type, onSave, onClose }) => {
                   placeholder="Miles (or laps)"
                   className="w-full text-lg font-bold text-center p-3 border-2 border-gray-200 rounded-xl focus:border-purple-600 outline-none bg-white text-gray-900"
                 />
-                <div className="text-[11px] text-gray-500 mt-2">Totally optional. If you’re just tracking consistency, skip it.</div>
+                <div className="text-[11px] text-gray-500 mt-2">Optional. If you’re just tracking consistency, skip it.</div>
               </div>
             )}
 
@@ -3367,25 +3089,20 @@ const CardioLogger = ({ type, onSave, onClose }) => {
 
       const [profile, setProfile] = useState({
         username: '',
-        weight: 0,
-        age: 0,
-        gender: 'Male',
-        experience: 'Beginner',
-        activityLevel: null,
-        avatar: '🦁',
-        goal: null,
-        gymType: '',
+        avatar: '💪',
+        workoutLocation: 'gym',
+        gymType: 'commercial',
         barWeight: 45,
         onboarded: false
       });
 
-      const [settings, setSettings] = useState({ showSuggestions: true, insightsEnabled: true, darkMode: false, showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
+      const [settings, setSettings] = useState({ insightsEnabled: true, darkMode: false, darkAccent: 'purple', showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
       const [history, setHistory] = useState({});
       const [cardioHistory, setCardioHistory] = useState({});
       const [tab, setTab] = useState('home');
       const [activeEquipment, setActiveEquipment] = useState(null);
       const [activeCardio, setActiveCardio] = useState(null);
-      const [view, setView] = useState('setup');
+      const [view, setView] = useState('onboarding');
       const [showAnalytics, setShowAnalytics] = useState(false);
 
       const [appState, setAppState] = useState({
@@ -3400,48 +3117,40 @@ const CardioLogger = ({ type, onSave, onClose }) => {
       const [dayEntries, setDayEntries] = useState({});
       const [lastExerciseStats, setLastExerciseStats] = useState({});
       const [generatedWorkout, setGeneratedWorkout] = useState(null);
+      const [dismissedGeneratedDate, setDismissedGeneratedDate] = useState(null);
       const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * motivationalQuotes.length));
 
       useEffect(() => {
-        const savedV2 = storage.get('ps_v2_profile', null);
-        const savedSettings = storage.get('ps_v2_settings', { showSuggestions: true, insightsEnabled: true, showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
+        const savedOnboarding = storage.get(ONBOARDING_KEY, false);
+        const savedProfileRaw = storage.get('ps_v2_profile', null);
+        const settingsDefaults = { insightsEnabled: true, darkMode: false, darkAccent: 'purple', showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true };
+        const savedSettings = storage.get('ps_v2_settings', settingsDefaults);
         const savedHistory = storage.get('ps_v2_history', {});
         const savedCardio = storage.get('ps_v2_cardio', {});
         const savedState = storage.get('ps_v2_state', { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
+        const savedDismiss = storage.get('ps_dismissed_generated_workout_date', null);
         
-        if (savedV2) {
-          const migratedProfile = {
-            ...savedV2,
-            gymType: savedV2.gymType || 'commercial',
-            barWeight: savedV2.barWeight || 45,
-            activityLevel: savedV2.activityLevel === 'Moderately Active' ? null : savedV2.activityLevel,
-            goal: savedV2.goal === 'recomp' ? null : savedV2.goal
-          };
-          setProfile(migratedProfile);
-          if (!savedV2.gymType || !savedV2.barWeight || savedV2.activityLevel === 'Moderately Active' || savedV2.goal === 'recomp') {
-            storage.set('ps_v2_profile', migratedProfile);
-          }
-          if (savedV2.onboarded) setView('app');
-        } else {
-          const savedV1 = storage.get('ps_profile', null);
-          if (savedV1 && savedV1.onboarded) {
-            const migrated = {
-              ...savedV1,
-              gymType: savedV1.gymType || 'commercial',
-              barWeight: savedV1.barWeight || 45,
-              activityLevel: savedV1.activityLevel === 'Moderately Active' ? null : savedV1.activityLevel,
-              goal: savedV1.goal === 'recomp' ? null : savedV1.goal
-            };
-            setProfile(migrated);
-            setView('app');
-            storage.set('ps_v2_profile', migrated);
-          }
-        }
-        
-        setSettings(savedSettings);
+        const migratedProfile = {
+          username: '',
+          avatar: '💪',
+          workoutLocation: 'gym',
+          gymType: 'commercial',
+          barWeight: 45,
+          onboarded: false,
+          ...(savedProfileRaw || {}),
+        };
+        migratedProfile.workoutLocation = migratedProfile.workoutLocation || (migratedProfile.gymType === 'home' ? 'home' : 'gym');
+        migratedProfile.gymType = migratedProfile.gymType || (migratedProfile.workoutLocation === 'home' ? 'home' : 'commercial');
+        migratedProfile.onboarded = migratedProfile.onboarded || !!savedOnboarding;
+
+        if (savedProfileRaw) setProfile(migratedProfile);
+        if (migratedProfile.onboarded) setView('app');
+
+        setSettings({ ...settingsDefaults, ...savedSettings });
         setHistory(savedHistory);
         setCardioHistory(savedCardio);
         setAppState(savedState);
+        setDismissedGeneratedDate(savedDismiss);
 
         const savedMeta = storage.get(STORAGE_KEY, null);
         const baseMeta = {
@@ -3474,11 +3183,17 @@ const CardioLogger = ({ type, onSave, onClose }) => {
         setLoaded(true);
       }, []);
 
-      useEffect(() => { if(loaded) storage.set('ps_v2_profile', profile); }, [profile, loaded]);
+      useEffect(() => { 
+        if(loaded) {
+          storage.set('ps_v2_profile', profile); 
+          storage.set(ONBOARDING_KEY, !!profile.onboarded);
+        }
+      }, [profile, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_settings', settings); }, [settings, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_history', history); }, [history, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_cardio', cardioHistory); }, [cardioHistory, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_state', appState); }, [appState, loaded]);
+      useEffect(() => { if(loaded) storage.set('ps_dismissed_generated_workout_date', dismissedGeneratedDate); }, [dismissedGeneratedDate, loaded]);
       useEffect(() => {
         if (!loaded) return;
         storage.set(STORAGE_KEY, {
@@ -3517,10 +3232,23 @@ const CardioLogger = ({ type, onSave, onClose }) => {
         }
       }, [settings.darkMode]);
 
+      useEffect(() => {
+        const accents = {
+          purple: { main: '#8B5CF6', deep: '#7C3AED', soft: 'rgba(139, 92, 246, 0.18)' },
+          red: { main: '#B91C1C', deep: '#991B1B', soft: 'rgba(185, 28, 28, 0.18)' },
+          gold: { main: '#D97706', deep: '#b45309', soft: 'rgba(217, 119, 6, 0.18)' },
+        };
+        const chosen = accents[settings.darkAccent] || accents.purple;
+        const root = document.documentElement;
+        root.style.setProperty('--accent', chosen.main);
+        root.style.setProperty('--accent-2', chosen.deep);
+        root.style.setProperty('--accent-soft', chosen.soft);
+      }, [settings.darkAccent]);
+
       const todayWorkoutType = useMemo(() => getTodaysWorkoutType(history, appState), [history, appState]);
 
       const strengthScoreObj = useMemo(() => {
-        if (!profile?.onboarded || profile.weight === 0) return { score: 0, avgPct: 0, coveragePct: 0, loggedCount: 0, total: Object.keys(EQUIPMENT_DB).length };
+        if (!profile?.onboarded) return { score: 0, avgPct: 0, coveragePct: 0, loggedCount: 0, total: Object.keys(EQUIPMENT_DB).length };
         return computeStrengthScore(profile, history);
       }, [profile, history]);
 
@@ -3667,53 +3395,58 @@ const CardioLogger = ({ type, onSave, onClose }) => {
         }));
         const dayKey = toDayKey(session.date ? new Date(session.date) : new Date());
         recordDayEntry(dayKey, 'workout');
-        // Unlock beginner mode after first logged strength OR cardio sessionsetActiveCardio(null);
+        setActiveCardio(null);
       };
 
       const handleReset = () => {
         if(confirm("Reset all data? This can't be undone.")) {
           const freshProfile = { 
             username: '', 
-            weight: 0, 
-            age: 0, 
-            gender: 'Male', 
-            experience: 'Beginner', 
-            activityLevel: 'Moderately Active', 
-            avatar: '🦁', 
-            goal: 'recomp',
-            gymType: '',
+            avatar: '💪', 
+            workoutLocation: 'gym',
+            gymType: 'commercial',
             barWeight: 45,
             onboarded: false,
           };
           setProfile(freshProfile);
           setHistory({});
           setCardioHistory({});
-          setView('intro');
+          setView('onboarding');
           setTab('home');
           setAppState({ lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
-          setSettings({ showSuggestions: true, insightsEnabled: true, darkMode: false, showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
+          setSettings({ insightsEnabled: true, darkMode: false, darkAccent: 'purple', showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
           setPinnedExercises([]);
           setRecentExercises([]);
           setExerciseUsageCounts({});
           setDayEntries({});
           setLastExerciseStats({});
           setGeneratedWorkout(null);
+          setDismissedGeneratedDate(null);
           storage.set('ps_v2_profile', null);
           storage.set('ps_v2_history', {});
           storage.set('ps_v2_cardio', {});
           storage.set('ps_v2_state', { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
-          storage.set('ps_v2_settings', { showSuggestions: true, insightsEnabled: true, darkMode: false, showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
+          storage.set('ps_v2_settings', { insightsEnabled: true, darkMode: false, darkAccent: 'purple', showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
           storage.set(STORAGE_KEY, { version: STORAGE_VERSION, pinnedExercises: [], recentExercises: [], exerciseUsageCounts: {}, dayEntries: {}, lastExerciseStats: {} });
+          storage.set(ONBOARDING_KEY, false);
+          storage.set('ps_dismissed_generated_workout_date', null);
         }
+      };
+
+      const handleResetOnboarding = () => {
+        storage.set(ONBOARDING_KEY, false);
+        setProfile(prev => ({ ...prev, onboarded: false }));
+        setView('onboarding');
       };
 
       const completeOnboarding = () => {
         setProfile(prev => ({
           ...prev,
           onboarded: true,
-          activityLevel: prev.activityLevel || 'Moderately Active',
-          goal: prev.goal || 'recomp'
+          workoutLocation: prev.workoutLocation || 'gym',
+          gymType: prev.gymType || 'commercial'
         }));
+        storage.set(ONBOARDING_KEY, true);
         setView('app');
         setTab('home');
       };
@@ -3841,7 +3574,7 @@ const CardioLogger = ({ type, onSave, onClose }) => {
         input.click();
       };
 
-      if (!loaded) return null;if (view === 'setup') return <ProfileSetup profile={profile} setProfile={setProfile} onComplete={completeOnboarding} />;
+      if (!loaded) return null;if (view === 'onboarding') return <OnboardingFlow profile={profile} setProfile={setProfile} onFinish={completeOnboarding} />;
 
       
 return (
@@ -3900,6 +3633,8 @@ return (
                       onLogRestDay={handleLogRestDay}
                       restDayLogged={restDayLogged}
                       hasWorkoutToday={hasWorkoutToday}
+                      dismissedGeneratedDate={dismissedGeneratedDate}
+                      setDismissedGeneratedDate={setDismissedGeneratedDate}
                     />
                   )}
                   {tab === 'profile' && (
@@ -3909,6 +3644,7 @@ return (
                       settings={settings}
                       setSettings={setSettings}
                       onReset={handleReset}
+                      onResetOnboarding={handleResetOnboarding}
                       onExportData={handleExportData}
                       onImportData={handleImportData}
                       streakObj={streakObj}
@@ -3938,6 +3674,8 @@ return (
                 type={activeCardio}
                 onSave={handleSaveCardioSession}
                 onClose={() => setActiveCardio(null)}
+                lastSession={(cardioHistory[activeCardio] || []).slice(-1)[0]}
+                insightsEnabled={settings.insightsEnabled !== false}
               />
             )}
           </div>
