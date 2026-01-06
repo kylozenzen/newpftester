@@ -1030,12 +1030,12 @@ const motivationalQuotes = [
       return null;
     };
 
-    const Card = ({ children, className = '', onClick }) => (
-      <div onClick={onClick} className={`bg-white p-4 rounded-xl border border-gray-200 ${className}`}>{children}</div>
+    const Card = ({ children, className = '', onClick, style }) => (
+      <div onClick={onClick} style={style} className={`bg-white p-4 rounded-xl border border-gray-200 ${className}`}>{children}</div>
     );
 
     const TabBar = ({ currentTab, setTab }) => (
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="fixed bottom-0 left-0 right-0 tabbar z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex justify-around items-center h-16 px-2">
           {[
             { id: 'home', label: 'Home', icon: 'Home' },
@@ -1047,7 +1047,7 @@ const motivationalQuotes = [
               onClick={() => setTab(t.id)} 
               className={`flex flex-col items-center gap-1 w-full h-full justify-center transition-colors ${
                 currentTab === t.id 
-                  ? 'text-purple-600' 
+                  ? 'tab-active' 
                   : 'text-gray-400'
               }`}
             >
@@ -1079,21 +1079,41 @@ const motivationalQuotes = [
 
     // ========== ONBOARDING ==========
 // Intro + onboarding flow
-const IntroSlide = ({ title, body, onNext, onSkip, isLast }) => (
-  <div className="flex flex-col h-full p-6 text-center">
-    <div className="flex-1 flex flex-col justify-center gap-4">
-      <div className="text-5xl">🏋️‍♂️</div>
-      <h1 className="text-2xl font-black text-gray-900">{title}</h1>
-      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">{body}</p>
-    </div>
-    <div className="flex items-center justify-between gap-3 mt-auto">
-      <button onClick={onSkip} className="text-sm font-bold text-gray-500">Skip</button>
-      <button onClick={onNext} className="flex-1 py-3 rounded-2xl bg-purple-600 text-white font-bold">{isLast ? 'Next' : 'Next'}</button>
-    </div>
+const OnboardingProgress = ({ step, total }) => (
+  <div className="onboarding-progress">
+    {[...Array(total)].map((_, idx) => (
+      <div key={idx} className={`dot ${idx <= step ? 'active' : ''}`} />
+    ))}
+    <span className="text-xs font-semibold text-gray-500">{step + 1} / {total}</span>
   </div>
 );
 
-const OnboardingForm = ({ profile, setProfile, onComplete }) => {
+const OnboardingCardShell = ({ children, step, total, onSkip }) => (
+  <div className="onboarding-card animate-slide-up">
+    <div className="flex items-start justify-between">
+      <OnboardingProgress step={step} total={total} />
+      {onSkip && <button className="ghost-button text-sm" onClick={onSkip}>Skip</button>}
+    </div>
+    {children}
+  </div>
+);
+
+const OnboardingIntro = ({ title, subhead, body, step, total, onNext, onSkip, emoji }) => (
+  <OnboardingCardShell step={step} total={total} onSkip={onSkip}>
+    <div className="flex flex-col items-center text-center gap-3 flex-1">
+      <div className="onboarding-hero">{emoji}</div>
+      <h1 className="onboarding-title">{title}</h1>
+      {subhead && <p className="onboarding-subhead">{subhead}</p>}
+      <p className="onboarding-body">{body}</p>
+    </div>
+    <div className="onboarding-actions">
+      <button className="ghost-button" onClick={onSkip}>Skip</button>
+      <button className="accent-button" onClick={onNext}>Next</button>
+    </div>
+  </OnboardingCardShell>
+);
+
+const OnboardingForm = ({ profile, setProfile, onComplete, onBack, step, total }) => {
   const canStart = profile.username && profile.avatar && profile.workoutLocation;
   const locationOptions = [
     { id: 'gym', label: 'Gym', detail: 'Commercial gym or studio', gymType: 'commercial' },
@@ -1102,34 +1122,31 @@ const OnboardingForm = ({ profile, setProfile, onComplete }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="flex-1 overflow-y-auto" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="bg-white px-6 pt-8 pb-6 border-b border-gray-100">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Onboarding</div>
-          <h1 className="text-2xl font-black text-gray-900 mt-1">Finish setup</h1>
-          <p className="text-sm text-gray-600 mt-2">Name, emoji, and where you train.</p>
-        </div>
-
-        <div className="p-6 space-y-5">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 block">Name</label>
+    <OnboardingCardShell step={step} total={total}>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-bold text-gray-500 uppercase">Quick setup</div>
+        {onBack && <button className="ghost-button text-sm" onClick={onBack}>Back</button>}
+      </div>
+      <div className="space-y-4 flex-1 flex flex-col">
+        <div className="form-tile">
+          <label className="field-label">Name</label>
             <input
               type="text"
               value={profile.username}
               onChange={(e) => setProfile({ ...profile, username: e.target.value })}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:border-purple-400 focus:bg-white transition-all"
+              className="input-surface"
               placeholder="Your name"
             />
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Pick an emoji</label>
+        <div className="form-tile">
+          <label className="field-label">Emoji avatar</label>
             <div className="grid grid-cols-5 gap-2">
               {AVATARS.map((a) => (
                 <button
                   key={a}
                   onClick={() => setProfile({ ...profile, avatar: a })}
-                  className={`p-3 rounded-xl text-2xl ${profile.avatar === a ? 'bg-purple-50 border-2 border-purple-400' : 'bg-gray-50 border border-gray-200'}`}
+                  className={`p-3 rounded-xl text-2xl border ${profile.avatar === a ? 'border-purple-400 bg-purple-50' : 'bg-gray-50 border-gray-200'}`}
                 >
                   {a}
                 </button>
@@ -1137,10 +1154,10 @@ const OnboardingForm = ({ profile, setProfile, onComplete }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Where are you working out?</label>
-            <div className="space-y-2">
-              {locationOptions.map((loc) => (
+        <div className="form-tile">
+          <label className="field-label">Where are you working out?</label>
+          <div className="space-y-2">
+            {locationOptions.map((loc) => (
                 <button
                   key={loc.id}
                   onClick={() => setProfile({ ...profile, workoutLocation: loc.id, gymType: loc.gymType })}
@@ -1150,7 +1167,7 @@ const OnboardingForm = ({ profile, setProfile, onComplete }) => {
                 >
                   <div className="text-2xl">{loc.id === 'gym' ? '🏋️' : loc.id === 'home' ? '🏠' : '🧳'}</div>
                   <div className="flex-1">
-                    <div className={`font-bold ${profile.workoutLocation === loc.id ? 'text-purple-700' : 'text-gray-900'}`}>{loc.label}</div>
+                  <div className={`font-bold ${profile.workoutLocation === loc.id ? 'text-purple-700' : 'text-gray-900'}`}>{loc.label}</div>
                     <div className="text-xs text-gray-500 mt-1">{loc.detail}</div>
                   </div>
                   {profile.workoutLocation === loc.id && <Icon name="Check" className="w-5 h-5 text-purple-600" />}
@@ -1158,53 +1175,55 @@ const OnboardingForm = ({ profile, setProfile, onComplete }) => {
               ))}
             </div>
           </div>
-        </div>
       </div>
-
-      <div className="bg-white border-t border-gray-100 p-4 shadow-2xl" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      <div className="onboarding-actions">
         <button
-          onClick={onComplete}
+          onClick={() => { if (canStart) onComplete(); }}
           disabled={!canStart}
-          className={`w-full py-4 rounded-2xl font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
-            canStart ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
-          }`}
+          className="accent-button"
         >
           Start Tracking
         </button>
       </div>
-    </div>
+    </OnboardingCardShell>
   );
 };
 
 const OnboardingFlow = ({ profile, setProfile, onFinish }) => {
   const [step, setStep] = useState(0);
-  const slides = [
-    {
-      title: 'A workout tracker that stays out of your way',
-      body: 'Planet Strength is simple.\nLog strength and cardio fast.\nSee your progress over time.\nNo programs. No guilt. No noise.',
-    },
-    {
-      title: 'Progress is you vs. you',
-      body: 'Add a rep. Add a little weight.\nOr just show up again.\nInsights are optional. Tracking always works.',
-    },
+  const steps = [
+    { type: 'intro', title: 'Planet Strength', subhead: 'A workout tracker that stays out of your way', body: 'Log strength and cardio fast.\nSee your progress over time.\nNo programs. No guilt. No noise.', emoji: '🪐' },
+    { type: 'intro', title: 'Progress is you vs. you', subhead: null, body: 'Add a rep. Add a little weight.\nOr just show up again.\nInsights are optional. Tracking always works.', emoji: '💫' },
+    { type: 'form' }
   ];
 
-  if (step < slides.length) {
-    const slide = slides[step];
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <IntroSlide
-          title={slide.title}
-          body={slide.body}
-          onSkip={() => setStep(slides.length)}
-          onNext={() => setStep(step + 1)}
-          isLast={step === slides.length - 1}
-        />
-      </div>
-    );
-  }
+  const total = steps.length;
 
-  return <OnboardingForm profile={profile} setProfile={setProfile} onComplete={onFinish} />;
+  return (
+    <div className="onboarding-shell">
+      {steps[step].type === 'intro' ? (
+        <OnboardingIntro
+          title={steps[step].title}
+          subhead={steps[step].subhead}
+          body={steps[step].body}
+          emoji={steps[step].emoji}
+          step={step}
+          total={total}
+          onSkip={() => setStep(total - 1)}
+          onNext={() => setStep(Math.min(step + 1, total - 1))}
+        />
+      ) : (
+        <OnboardingForm
+          profile={profile}
+          setProfile={setProfile}
+          onComplete={onFinish}
+          onBack={() => setStep((prev) => Math.max(prev - 1, 0))}
+          step={step}
+          total={total}
+        />
+      )}
+    </div>
+  );
 };
 
 // ========== CALCULATIONS ==========
@@ -1304,14 +1323,21 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
             <div className="text-xs text-gray-400 font-bold uppercase tracking-wide">Planet Strength</div>
             <h1 className="text-2xl font-black text-gray-900">Hi, {profile.username || 'Athlete'}</h1>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl border border-purple-200">
             {profile.avatar}
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-        <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 relative">
+        <Card
+          className="relative"
+          style={{
+            background: 'linear-gradient(145deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))',
+            border: '1px solid var(--accent-soft)',
+            boxShadow: '0 16px 42px var(--accent-soft)'
+          }}
+        >
           <button
             onClick={onRefreshQuote}
             className="absolute top-3 right-3 p-2 rounded-full bg-white/70 text-purple-700 hover:bg-white"
@@ -1327,7 +1353,7 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
           </div>
         </Card>
 
-        <Card className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+        <Card className="flex items-center justify-between" style={{ background: 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(234, 88, 12, 0.12))' }}>
           <div className="flex items-center gap-3">
             <div className="text-3xl">🔥</div>
             <div>
@@ -2750,32 +2776,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
-                  <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
-                  <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
-                </div>
-                <div className="ml-auto text-right">
-                  <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
-                  <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
-                  <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
-                <div className="bg-white rounded-xl p-2 border border-gray-100">
-                  <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
-                  <div>Workouts logged</div>
-                </div>
-                <div className="bg-white rounded-xl p-2 border border-gray-100">
-                  <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
-                  <div>Rest days</div>
-                </div>
-              </div>
-            </Card>
-
             <Card className="space-y-3">
               <div className="text-xs font-bold text-gray-500 uppercase">Workout</div>
               <ToggleRow
@@ -2817,6 +2817,48 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                     </button>
                   ))}
                 </div>
+                <div className="accent-preview">
+                  <div className="swatch">
+                    <span className="chip">Active</span>
+                    <span className="btn">Button</span>
+                    <div className="card">Card border</div>
+                  </div>
+                  <div className="swatch">
+                    <span className="chip">Focus</span>
+                    <span style={{ boxShadow: 'var(--focus-ring)', borderRadius: '12px', width: '100%', height: '12px', display: 'block' }}></span>
+                    <span className="text-[11px] text-gray-500">Preview</span>
+                  </div>
+                  <div className="swatch">
+                    <span className="chip">Glow</span>
+                    <span className="btn" style={{ boxShadow: '0 10px 24px var(--accent-soft)' }}>Tap</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 8%, transparent))' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
+                  <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
+                  <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
+                </div>
+                <div className="ml-auto text-right">
+                  <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
+                  <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
+                  <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
+                <div className="bg-white rounded-xl p-2 border border-gray-100">
+                  <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
+                  <div>Workouts logged</div>
+                </div>
+                <div className="bg-white rounded-xl p-2 border border-gray-100">
+                  <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
+                  <div>Rest days</div>
+                </div>
               </div>
             </Card>
 
@@ -2834,7 +2876,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-gray-500 uppercase">Profile</div>
-                  <div className="text-sm text-gray-500">Edit name, emoji, and location</div>
+                  <div className="text-sm text-gray-500">Edit name, emoji, location, and onboarding</div>
                 </div>
                 <button onClick={() => setEditing(!editing)} className="text-purple-600 font-bold text-sm">{editing ? 'Close' : 'Edit'}</button>
               </div>
@@ -2887,10 +2929,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                   </button>
                 </div>
               )}
-            </Card>
-
-            <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
               <button
                 onClick={onResetOnboarding}
                 className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold flex items-center justify-between"
@@ -2898,6 +2936,10 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                 <span>Reset onboarding</span>
                 <Icon name="RefreshCw" className="w-4 h-4 text-gray-500" />
               </button>
+            </Card>
+
+            <Card className="space-y-3">
+              <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={onExportData}
@@ -3234,15 +3276,16 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       useEffect(() => {
         const accents = {
-          purple: { main: '#8B5CF6', deep: '#7C3AED', soft: 'rgba(139, 92, 246, 0.18)' },
-          red: { main: '#B91C1C', deep: '#991B1B', soft: 'rgba(185, 28, 28, 0.18)' },
-          gold: { main: '#D97706', deep: '#b45309', soft: 'rgba(217, 119, 6, 0.18)' },
+          purple: { main: '#8B5CF6', hover: '#7C3AED', soft: 'rgba(139, 92, 246, 0.18)' },
+          red: { main: '#B91C1C', hover: '#991B1B', soft: 'rgba(185, 28, 28, 0.18)' },
+          gold: { main: '#D97706', hover: '#b45309', soft: 'rgba(217, 119, 6, 0.18)' },
         };
         const chosen = accents[settings.darkAccent] || accents.purple;
         const root = document.documentElement;
         root.style.setProperty('--accent', chosen.main);
-        root.style.setProperty('--accent-2', chosen.deep);
         root.style.setProperty('--accent-soft', chosen.soft);
+        root.style.setProperty('--accent-hover', chosen.hover);
+        root.style.setProperty('--focus-ring', `0 0 0 3px ${chosen.soft}`);
       }, [settings.darkAccent]);
 
       const todayWorkoutType = useMemo(() => getTodaysWorkoutType(history, appState), [history, appState]);
@@ -3687,3 +3730,8 @@ return (
       React.createElement(App),
       document.getElementById('root')
     );
+      useEffect(() => {
+        if (!insightsEnabled && activeTab !== 'workout') {
+          setActiveTab('workout');
+        }
+      }, [insightsEnabled, activeTab]);
