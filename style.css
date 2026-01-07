@@ -581,6 +581,8 @@ select:focus-visible {
 .hold-button {
   position: relative;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .hold-button .hold-progress {
@@ -611,14 +613,14 @@ select:focus-visible {
 }
 
 .quick-generator-button {
-  padding: 12px 18px;
+  padding: 14px 20px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 14px;
-  background: var(--surface);
+  font-size: 15px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: var(--text);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
   transition: transform 0.1s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -641,6 +643,57 @@ select:focus-visible {
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.generated-badge {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.draft-menu {
+  position: absolute;
+  top: 38px;
+  right: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+  padding: 6px;
+  min-width: 140px;
+}
+
+.finish-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 72px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(246,247,251,0.95) 25%, rgba(246,247,251,0.98) 100%);
+  pointer-events: none;
+}
+
+body.dark-mode .finish-footer {
+  background: linear-gradient(180deg, rgba(5,7,13,0) 0%, rgba(5,7,13,0.92) 25%, rgba(5,7,13,0.98) 100%);
+}
+
+.finish-footer .finish-button {
+  pointer-events: auto;
+}
+
+body.dark-mode .text-gray-500 {
+  color: color-mix(in srgb, var(--text) 78%, var(--muted)) !important;
+}
+
+body.dark-mode .text-gray-400 {
+  color: color-mix(in srgb, var(--text) 62%, var(--muted)) !important;
 }
 
 .workout-banner {
