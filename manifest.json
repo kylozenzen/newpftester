@@ -1,0 +1,24 @@
+{
+  "name": "Planet Strength",
+  "short_name": "Planet Strength",
+  "description": "Planet Strength is a calm, simple workout tracker.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0B1020",
+  "theme_color": "#8B5CF6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
