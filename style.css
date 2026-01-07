@@ -535,6 +535,14 @@ select:focus-visible {
   box-shadow: none;
 }
 
+.quote-text {
+  color: var(--text);
+}
+
+.quote-author {
+  color: var(--muted);
+}
+
 .cues-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -600,6 +608,59 @@ select:focus-visible {
 
 .tab-active {
   color: var(--accent) !important;
+}
+
+.quick-generator-button {
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  transition: transform 0.1s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quick-generator-button:hover {
+  border-color: var(--accent);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
+}
+
+.quick-generator-button:active {
+  transform: scale(0.98);
+}
+
+.draft-badge {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.workout-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.filter-chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-chip-row .filter-chip {
+  white-space: nowrap;
 }
 
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }

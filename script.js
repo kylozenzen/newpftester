@@ -860,6 +860,7 @@ const motivationalQuotes = [
     const STORAGE_KEY = 'ps_v3_meta';
     const ONBOARDING_KEY = 'ps_onboarding_complete';
     const ACTIVE_SESSION_KEY = 'ps_active_session';
+    const DRAFT_SESSION_KEY = 'ps_draft_session';
     const LAST_OPEN_KEY = 'ps_last_open';
 
     const uniqueDayKeysFromHistory = (history, cardioHistory = {}, restDays = [], dayEntries = null) => {
@@ -1397,7 +1398,7 @@ const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
   );
 };
 
-const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRefreshQuote, lastWorkoutLabel, activeSession, generatorOptions, setGeneratorOptions }) => {
+const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, lastWorkoutLabel, activeSession }) => {
   const quote = motivationalQuotes[quoteIndex % motivationalQuotes.length];
   const homeMessages = [
     'Keep it simple today.',
@@ -1408,6 +1409,7 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
   const subMessage = homeMessages[quoteIndex % homeMessages.length];
   const isResuming = activeSession?.status === 'in_progress';
   const loggedCount = (activeSession?.items || []).filter(item => item.sets > 0).length;
+  const lastWorkoutText = lastWorkoutLabel ? lastWorkoutLabel : 'First workout? Log one today.';
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -1440,8 +1442,8 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
             <div className="text-2xl">🗓️</div>
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase">Last workout</div>
-              <div className="text-sm font-black text-gray-900">{lastWorkoutLabel || 'First workout?'}</div>
-              <div className="text-[11px] text-gray-500">{lastWorkoutLabel ? 'Keep the streak calm.' : 'Log one today.'}</div>
+              <div className="text-sm font-black text-gray-900">{lastWorkoutText}</div>
+              <div className="text-[11px] text-gray-500">{lastWorkoutLabel ? 'You vs. you.' : 'Log one today.'}</div>
             </div>
           </Card>
         </div>
@@ -1479,30 +1481,22 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
               <button
                 key={pill.id}
                 onClick={() => onGenerate(pill.id)}
-                className="whitespace-nowrap px-4 py-2 rounded-full bg-gray-100 text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 border border-gray-200 active:scale-95 transition-all"
+                className="quick-generator-button whitespace-nowrap"
               >
                 {pill.label}
               </button>
             ))}
           </div>
-          <GeneratorOptions options={generatorOptions} onUpdate={setGeneratorOptions} />
           <div className="text-[11px] text-gray-500">
-            Generated workouts open in the Workout tab for quick edits.
+            Drafts open in the Workout tab for quick edits.
           </div>
         </Card>
 
         <Card className="relative quote-card">
-          <button
-            onClick={onRefreshQuote}
-            className="absolute top-3 right-3 p-2 rounded-full bg-white/70 text-purple-700 hover:bg-white"
-            aria-label="Refresh quote"
-          >
-            <Icon name="RefreshCw" className="w-4 h-4" />
-          </button>
-          <div className="text-sm font-medium italic leading-relaxed text-purple-900 dark-mode-quote-text">
+          <div className="text-sm font-medium italic leading-relaxed quote-text">
             “{quote.quote}”
           </div>
-          <div className="text-xs font-semibold mt-2 text-purple-600 dark-mode-quote-author">
+          <div className="text-xs font-semibold mt-2 quote-author">
             — {quote.author}
           </div>
         </Card>
@@ -1511,15 +1505,18 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
   );
 };
 
-const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, generatedWorkout, onRegenerateGeneratedWorkout, onSwapGeneratedExercise, onStartGeneratedWorkout, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedGeneratedDate, setDismissedGeneratedDate, activeSession, onStartSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions }) => {
+const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartDraftWorkout, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapIndex, setSwapIndex] = useState(null);
   const [holdingFinish, setHoldingFinish] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
-  const [generatedCollapsed, setGeneratedCollapsed] = useState(false);
+  const [draftCollapsed, setDraftCollapsed] = useState(false);
+  const [draftOptionsOpen, setDraftOptionsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('plan');
   const holdTimerRef = useRef(null);
   const searchInputRef = useRef(null);
+  const draftCardRef = useRef(null);
 
   const gymType = GYM_TYPES[profile.gymType];
 
@@ -1537,15 +1534,17 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
   const filteredPinned = pinnedExercises.filter(id => availableEquipment.includes(id));
   const filteredRecents = recentExercises.filter(id => availableEquipment.includes(id)).slice(0, 12);
   const todayKey = toDayKey(new Date());
-  const generatedHidden = dismissedGeneratedDate === todayKey;
+  const draftHidden = dismissedDraftDate === todayKey;
   const sessionEntries = useMemo(() => {
     if (!activeSession || activeSession.date !== todayKey) return [];
     return activeSession.items || [];
   }, [activeSession, todayKey]);
   const sessionHasLogged = sessionEntries.some(entry => entry.sets > 0);
   const canFinish = activeSession && (activeSession.status === 'in_progress' || sessionHasLogged);
-  const canHideGenerated = generatedWorkout && !sessionHasLogged;
-  const shouldHideGenerated = generatedHidden && canHideGenerated;
+  const isSessionMode = viewMode === 'session' && activeSession?.status === 'in_progress';
+  const isPlanMode = !isSessionMode;
+  const canHideDraft = draftPlan && !sessionHasLogged;
+  const shouldHideDraft = draftHidden && canHideDraft;
 
   const filterOptions = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Pinned'];
 
@@ -1595,8 +1594,35 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
   }, [settings.showAllExercises]);
 
   useEffect(() => {
-    if (!generatedWorkout) setGeneratedCollapsed(false);
-  }, [generatedWorkout]);
+    if (!draftPlan) setDraftCollapsed(false);
+  }, [draftPlan]);
+
+  useEffect(() => {
+    if (draftPlan) setDraftOptionsOpen(false);
+  }, [draftPlan]);
+
+  useEffect(() => {
+    if (!activeSession || activeSession.status !== 'in_progress') {
+      setViewMode('plan');
+    }
+  }, [activeSession]);
+
+  useEffect(() => {
+    if (!focusDraft || !draftPlan || !isPlanMode) return;
+    const target = draftCardRef.current;
+    if (target) {
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+    onDraftFocused?.();
+  }, [focusDraft, draftPlan, isPlanMode, onDraftFocused]);
+
+  useEffect(() => {
+    if (focusDraft) {
+      setViewMode('plan');
+    }
+  }, [focusDraft]);
 
   useEffect(() => {
     return () => {
@@ -1623,7 +1649,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
     return (
       <button
         key={id}
-        onClick={() => onEquipmentSelect(id)}
+        onClick={() => onSelectExercise(id, isSessionMode ? 'session' : 'plan')}
         className="w-full p-3 rounded-xl border border-gray-200 bg-white flex items-center justify-between active:scale-[0.98] transition"
       >
         <div className="flex items-center gap-3 text-left">
@@ -1656,7 +1682,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
     return (
       <button
         key={id}
-        onClick={() => onEquipmentSelect(id)}
+        onClick={() => onSelectExercise(id, isSessionMode ? 'session' : 'plan')}
         className="tile text-left active:scale-[0.98] transition"
       >
         <div className="flex items-center justify-between mb-1">
@@ -1675,12 +1701,12 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
   };
 
   const swapOptions = useMemo(() => {
-    if (swapIndex === null || !generatedWorkout) return [];
-    const currentId = generatedWorkout.exercises[swapIndex];
+    if (swapIndex === null || !draftPlan) return [];
+    const currentId = draftPlan.exercises[swapIndex];
     const current = EQUIPMENT_DB[currentId];
     const pool = availableEquipment.filter(id => id !== currentId && (!current || (EQUIPMENT_DB[id]?.target === current.target || EQUIPMENT_DB[id]?.tags?.some(t => current.tags?.includes(t)))));
     return pool.slice(0, 20);
-  }, [swapIndex, generatedWorkout, availableEquipment]);
+  }, [swapIndex, draftPlan, availableEquipment]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 workout-shell">
@@ -1698,27 +1724,33 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
             😴 Log Rest Day
           </button>
         </div>
+        {isPlanMode && activeSession?.status === 'in_progress' && (
+          <div className="px-4 pb-3">
+            <div className="workout-banner flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold workout-muted uppercase">Workout in progress</div>
+                <div className="text-sm font-black workout-heading">Resume today’s session</div>
+                <div className="text-[11px] workout-muted">{sessionEntries.length} exercises logged</div>
+              </div>
+              <button
+                onClick={() => setViewMode('session')}
+                className="px-3 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold"
+              >
+                Resume
+              </button>
+            </div>
+          </div>
+        )}
         <div className="px-4 pb-4">
           <div className="relative">
             <Icon name="Search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search exercises..."
+              placeholder={isSessionMode ? 'Add exercises to this session...' : 'Search exercises...'}
               ref={searchInputRef}
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
-          </div>
-          <div className="flex flex-wrap gap-2 pt-3">
-            {filterOptions.map(option => (
-              <button
-                key={option}
-                onClick={() => setActiveFilter(option)}
-                className={`filter-chip ${activeFilter === option ? 'active' : ''}`}
-              >
-                {option}
-              </button>
-            ))}
           </div>
           {!libraryVisible && (
             <button
@@ -1731,8 +1763,8 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-28 px-4 pt-4 space-y-4">
-        {!activeSession && !activeEquipment && (
+      <div className="flex-1 overflow-y-auto pb-28 px-4 pt-6 space-y-4">
+        {isPlanMode && !draftPlan && !activeSession && !activeEquipment && (
           <Card className="space-y-3 workout-card">
             <div className="text-sm font-bold workout-heading">Start here</div>
             <div className="flex flex-col gap-2">
@@ -1746,22 +1778,26 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
                 Search exercises
               </button>
               <button
-                onClick={onStartSession}
+                onClick={() => {
+                  onSelectExercise(null, 'plan', { createDraftOnly: true });
+                  setDraftCollapsed(false);
+                }}
                 className="w-full py-3 rounded-xl border border-gray-200 font-bold text-sm bg-white text-gray-900 active:scale-[0.98] transition"
               >
                 Start today’s session
               </button>
             </div>
-            <div className="text-xs workout-muted">Pick an exercise to log, or start a session and add as you go.</div>
+            <div className="text-xs workout-muted">Pick an exercise to log, or start a draft and build as you go.</div>
           </Card>
         )}
 
-        {activeSession && (
+        {isSessionMode && activeSession && (
           <Card className="space-y-3 workout-card">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold workout-muted uppercase">Active Session (Today)</div>
-                <div className="text-lg font-black workout-heading">Today’s session</div>
+                <div className="text-xs font-bold workout-muted uppercase">Workout in progress</div>
+                <div className="text-lg font-black workout-heading">Today’s Session</div>
+                <div className="text-[11px] workout-muted">Log as you go</div>
               </div>
               {canFinish && (
                 <button
@@ -1792,35 +1828,47 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
                 ))}
               </div>
             )}
+            <button
+              onClick={() => searchInputRef.current?.focus()}
+              className="w-full py-2 rounded-xl border border-gray-200 text-sm font-bold bg-white text-gray-900 active:scale-[0.98]"
+            >
+              + Add exercise
+            </button>
           </Card>
         )}
 
-        {generatedWorkout && !shouldHideGenerated && (
-          <Card className="space-y-3 border-purple-200 bg-purple-50 workout-card">
+        {isPlanMode && draftPlan && !shouldHideDraft && (
+          <Card className="space-y-3 workout-card" ref={draftCardRef}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-purple-600 uppercase">Generated</div>
-                <div className="text-lg font-black workout-heading">{generatedWorkout.label}</div>
-                <div className="text-[11px] workout-muted">Ready for today • {activeSession?.status === 'in_progress' ? 'In progress' : 'Draft'}</div>
+                <div className="flex items-center gap-2">
+                  <span className="draft-badge">Draft</span>
+                  <div className="text-xs font-bold workout-muted uppercase">Draft for today</div>
+                </div>
+                <div className="text-lg font-black workout-heading">{draftPlan.label || 'Workout Draft'}</div>
+                <div className="text-[11px] workout-muted">Ready · Not started</div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    if (canHideGenerated) {
-                      setDismissedGeneratedDate(todayKey);
+                    if (canHideDraft) {
+                      onHideDraft(todayKey);
                     } else {
-                      setGeneratedCollapsed(prev => !prev);
+                      setDraftCollapsed(prev => !prev);
                     }
                   }}
                   className="text-xs font-bold text-gray-500"
                 >
-                  {canHideGenerated ? 'Hide for today' : (generatedCollapsed ? 'Expand' : 'Collapse')}
+                  {canHideDraft ? 'Hide for today' : (draftCollapsed ? 'Expand' : 'Collapse')}
                 </button>
-                <button onClick={onRegenerateGeneratedWorkout} className="text-sm font-bold text-purple-700">Regenerate</button>
+                <button onClick={onRegenerateDraft} className="text-sm font-bold text-purple-700">Regenerate</button>
               </div>
             </div>
-            <div className={`space-y-3 ${generatedCollapsed ? 'hidden' : ''}`}>
-              {generatedWorkout.exercises.map((id, idx) => {
+            <div className={`space-y-3 ${draftCollapsed ? 'hidden' : ''}`}>
+              {(draftPlan.exercises || []).length === 0 && (
+                <div className="text-xs workout-muted">Draft is empty. Add exercises below.</div>
+              )}
+              {(draftPlan.exercises || []).map((id, idx) => {
                 const eq = EQUIPMENT_DB[id];
                 return (
                   <div key={`${id}-${idx}`} className="p-3 rounded-xl border border-gray-200 bg-white flex items-center justify-between">
@@ -1837,33 +1885,38 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
                   </div>
                 );
               })}
-              {(generatedWorkout?.options?.goal || generatedWorkout?.options?.duration || generatedWorkout?.options?.equipment) && (
-                <div className="flex flex-wrap gap-2">
-                  {generatedWorkout.options.goal && <span className="filter-chip active">Goal: {formatOptionLabel(generatedWorkout.options.goal)}</span>}
-                  {generatedWorkout.options.duration && <span className="filter-chip active">{generatedWorkout.options.duration} min</span>}
-                  {generatedWorkout.options.equipment && <span className="filter-chip active">{formatOptionLabel(generatedWorkout.options.equipment, 'equipment')}</span>}
-                </div>
+              <button
+                onClick={() => setDraftOptionsOpen(prev => !prev)}
+                className="text-xs font-bold text-purple-700 text-left"
+              >
+                {draftOptionsOpen ? 'Hide draft options' : 'Edit draft options'}
+              </button>
+              {draftOptionsOpen && (
+                <GeneratorOptions options={generatorOptions} onUpdate={setGeneratorOptions} compact />
               )}
             </div>
             <button
-              onClick={onStartGeneratedWorkout}
+              onClick={() => {
+                onStartDraftWorkout();
+                setViewMode('session');
+              }}
               className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98]"
             >
-              Start This Workout
+              Start this workout
             </button>
           </Card>
         )}
-        {generatedWorkout && shouldHideGenerated && (
+        {isPlanMode && draftPlan && shouldHideDraft && (
           <Card className="flex items-center justify-between workout-card">
-            <div className="text-sm workout-muted">Today’s workout hidden</div>
-            <button onClick={() => setDismissedGeneratedDate(null)} className="text-purple-700 font-bold text-sm">Show</button>
+            <div className="text-sm workout-muted">Draft hidden for today</div>
+            <button onClick={() => onHideDraft(null)} className="text-purple-700 font-bold text-sm">Show</button>
           </Card>
         )}
 
         <Card className="space-y-2 workout-card">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold workout-muted uppercase">Pinned Exercises</div>
-            <div className="text-xs workout-muted">Tap to log</div>
+            <div className="text-xs workout-muted">{isSessionMode ? 'Tap to log' : 'Tap to add'}</div>
           </div>
           {filteredPinned.length === 0 ? (
             <div className="text-xs workout-muted">Pin your go-tos for quick access.</div>
@@ -1874,14 +1927,14 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
           )}
         </Card>
 
-        {filteredRecents.length > 0 && (
+        {isPlanMode && filteredRecents.length > 0 && (
           <Card className="space-y-2 workout-card">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Recent</div>
               <div className="text-xs workout-muted">Last used</div>
             </div>
             <div className="space-y-2">
-              {filteredRecents.map(id => renderExerciseRow(id, 'Resume'))}
+              {filteredRecents.map(id => renderExerciseRow(id, isSessionMode ? 'Log' : 'Add'))}
             </div>
           </Card>
         )}
@@ -1890,7 +1943,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
           <Card className="space-y-2 workout-card">
             <div className="text-xs font-bold workout-muted uppercase">Search Results</div>
             <div className="space-y-2">
-              {searchResults.map(id => renderExerciseRow(id, 'Log'))}
+              {searchResults.map(id => renderExerciseRow(id, isSessionMode ? 'Log' : 'Add'))}
             </div>
           </Card>
         )}
@@ -1900,6 +1953,17 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Full Library</div>
               <button onClick={() => setLibraryVisible(false)} className="text-xs text-purple-700 font-bold">Hide</button>
+            </div>
+            <div className="filter-chip-row no-scrollbar">
+              {filterOptions.map(option => (
+                <button
+                  key={option}
+                  onClick={() => setActiveFilter(option)}
+                  className={`filter-chip ${activeFilter === option ? 'active' : ''}`}
+                >
+                  {option}
+                </button>
+              ))}
             </div>
             <div className="exercise-grid">
               {filteredPool.map(renderExerciseTile)}
@@ -1940,7 +2004,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
               {swapOptions.map(id => (
                 <button
                   key={id}
-                  onClick={() => { onSwapGeneratedExercise(swapIndex, id); setSwapIndex(null); }}
+                  onClick={() => { onSwapDraftExercise(swapIndex, id); setSwapIndex(null); }}
                   className="w-full p-3 rounded-xl border border-gray-200 text-left bg-gray-50 active:scale-[0.98]"
                 >
                   <div className="font-bold text-gray-900 text-sm">{EQUIPMENT_DB[id]?.name}</div>
@@ -2077,8 +2141,10 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const [baselineInputs, setBaselineInputs] = useState({ weight: '', reps: '' });
       const [baselineConfirmed, setBaselineConfirmed] = useState(sessions.length > 0);
       const [note, setNote] = useState('');
+      const [isAddingSet, setIsAddingSet] = useState(false);
       const savedRef = useRef(false);
       const latestDraftRef = useRef({ loggedSets: [], anchorWeight: '', anchorReps: '', anchorAdjusted: false, note: '' });
+      const lastSetSubmitRef = useRef({ key: '', at: 0 });
 
       const best = useMemo(() => getBestForEquipment(sessions), [sessions]);
       const nextTarget = useMemo(() => getNextTarget(profile, id, best), [profile, id, best]);
@@ -2162,7 +2228,14 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         const w = Number(anchorWeight);
         const r = Number(anchorReps);
         if (!w || !r || w <= 0 || r <= 0) return;
+        if (isAddingSet) return;
+        const now = Date.now();
+        const key = `${w}-${r}`;
+        if (lastSetSubmitRef.current.key === key && now - lastSetSubmitRef.current.at < 900) return;
+        lastSetSubmitRef.current = { key, at: now };
+        setIsAddingSet(true);
         setLoggedSets(prev => [...prev, { weight: w, reps: r }]);
+        setTimeout(() => setIsAddingSet(false), 300);
         setEditingIndex(null);
       };
 
@@ -2429,13 +2502,13 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
 
                             <button
                               onClick={handleQuickAddSet}
-                              disabled={!anchorWeight || !anchorReps || isBaselineMode}
+                              disabled={!anchorWeight || !anchorReps || isBaselineMode || isAddingSet}
                               className={`w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                                (!anchorWeight || !anchorReps || isBaselineMode) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
+                                (!anchorWeight || !anchorReps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
                               }`}
                             >
                               <span className="text-lg">＋</span>
-                              Add Set
+                              {isAddingSet ? 'Adding...' : 'Add Set'}
                             </button>
 
                             <div className="text-[10px] text-purple-700/80 font-semibold">
@@ -3147,9 +3220,8 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
 
             <Card className="space-y-3">
               <div className="text-xs font-bold text-gray-500 uppercase">About Planet Strength</div>
-              <div className="text-sm text-gray-600">A calm, no-noise workout tracker for fast logging and simple progress.</div>
+              <div className="text-sm text-gray-600">A calm, no-noise workout tracker focused on simple logging and steady progress.</div>
               <div className="text-xs text-gray-500">Version {APP_VERSION}</div>
-              <div className="text-xs text-gray-500">Built by Ben</div>
               <div className="grid grid-cols-1 gap-2">
                 <a href={`mailto:${FEEDBACK_EMAIL}`} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
                   Send feedback
@@ -3265,11 +3337,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
   const [distance, setDistance] = useState('');
   const [notes, setNotes] = useState('');
   const [intensity, setIntensity] = useState('moderate'); // easy | moderate | hard
+  const [isSaving, setIsSaving] = useState(false);
+  const lastSaveRef = useRef({ key: '', at: 0 });
 
   const canSave = Number(duration) > 0;
 
   const handleSave = () => {
-    if (!canSave) return;
+    if (!canSave || isSaving) return;
     const payload = {
       activityId,
       activityLabel: (meta.regularActivities || []).find(a => a.id === activityId)?.label || 'Custom',
@@ -3278,7 +3352,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       intensity,
       note: notes ? notes.trim() : undefined
     };
+    const key = JSON.stringify(payload);
+    const now = Date.now();
+    if (lastSaveRef.current.key === key && now - lastSaveRef.current.at < 1200) return;
+    lastSaveRef.current = { key, at: now };
+    setIsSaving(true);
     onSave(type, payload);
+    setTimeout(() => setIsSaving(false), 600);
   };
 
   return (
@@ -3403,12 +3483,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         <div className="bg-white border-t border-gray-100 p-4 shadow-2xl" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <button
             onClick={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             className={`w-full py-4 rounded-2xl font-bold text-white shadow-lg transition-all active:scale-[0.98] ${
-              canSave ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
+              canSave && !isSaving ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'
             }`}
           >
-            Save Cardio
+            {isSaving ? 'Saving...' : 'Save Cardio'}
           </button>
         </div>
       </div>
@@ -3452,8 +3532,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [exerciseUsageCounts, setExerciseUsageCounts] = useState({});
       const [dayEntries, setDayEntries] = useState({});
       const [lastExerciseStats, setLastExerciseStats] = useState({});
-      const [generatedWorkout, setGeneratedWorkout] = useState(null);
-      const [dismissedGeneratedDate, setDismissedGeneratedDate] = useState(null);
+      const [draftPlan, setDraftPlan] = useState(null);
+      const [dismissedDraftDate, setDismissedDraftDate] = useState(null);
+      const [focusDraft, setFocusDraft] = useState(false);
       const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * motivationalQuotes.length));
       const [generatorOptions, setGeneratorOptions] = useState({ goal: '', duration: '', equipment: '' });
 
@@ -3474,6 +3555,31 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         };
       };
 
+      const normalizeDraftPlan = (draft) => {
+        if (!draft) return null;
+        if (draft.exercises) {
+          return {
+            date: draft.date || toDayKey(new Date()),
+            label: draft.label || 'Workout Draft',
+            exercises: draft.exercises || [],
+            options: draft.options || {},
+            status: 'draft',
+            createdFrom: draft.createdFrom || 'generated'
+          };
+        }
+        if (draft.items) {
+          return {
+            date: draft.date || toDayKey(new Date()),
+            label: draft.label || 'Workout Draft',
+            exercises: (draft.items || []).map(item => item.id),
+            options: draft.options || {},
+            status: 'draft',
+            createdFrom: draft.createdFrom || 'generated'
+          };
+        }
+        return null;
+      };
+
       useEffect(() => {
         const savedOnboarding = storage.get(ONBOARDING_KEY, false);
         const savedProfileRaw = storage.get('ps_v2_profile', null);
@@ -3482,9 +3588,11 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const savedHistory = storage.get('ps_v2_history', {});
         const savedCardio = storage.get('ps_v2_cardio', {});
         const savedState = storage.get('ps_v2_state', { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
-        const savedDismiss = storage.get('ps_dismissed_generated_workout_date', null);
+        const savedDismiss = storage.get('ps_dismissed_draft_date', null);
         const savedActiveSession = storage.get(ACTIVE_SESSION_KEY, null);
+        const savedDraftPlan = storage.get(DRAFT_SESSION_KEY, null);
         const normalizedActiveSession = normalizeActiveSession(savedActiveSession);
+        const normalizedDraftPlan = normalizeDraftPlan(savedDraftPlan);
         const currentDayKey = toDayKey(new Date());
         
         const migratedProfile = {
@@ -3507,8 +3615,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setHistory(savedHistory);
         setCardioHistory(savedCardio);
         setAppState(savedState);
-        setDismissedGeneratedDate(savedDismiss);
+        setDismissedDraftDate(savedDismiss);
         setActiveSession(normalizedActiveSession?.date === currentDayKey ? normalizedActiveSession : null);
+        setDraftPlan(normalizedDraftPlan?.date === currentDayKey ? normalizedDraftPlan : null);
 
         const savedMeta = storage.get(STORAGE_KEY, null);
         const baseMeta = {
@@ -3551,8 +3660,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       useEffect(() => { if(loaded) storage.set('ps_v2_history', history); }, [history, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_cardio', cardioHistory); }, [cardioHistory, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_state', appState); }, [appState, loaded]);
-      useEffect(() => { if(loaded) storage.set('ps_dismissed_generated_workout_date', dismissedGeneratedDate); }, [dismissedGeneratedDate, loaded]);
+      useEffect(() => { if(loaded) storage.set('ps_dismissed_draft_date', dismissedDraftDate); }, [dismissedDraftDate, loaded]);
       useEffect(() => { if(loaded) storage.set(ACTIVE_SESSION_KEY, activeSession); }, [activeSession, loaded]);
+      useEffect(() => { if(loaded) storage.set(DRAFT_SESSION_KEY, draftPlan); }, [draftPlan, loaded]);
       useEffect(() => {
         if (!loaded) return;
         storage.set(STORAGE_KEY, {
@@ -3694,6 +3804,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const hasWorkoutToday = dayEntries?.[todayKey]?.type === 'workout';
       const restDayLogged = dayEntries?.[todayKey]?.type === 'rest';
       const activeSessionToday = activeSession?.date === todayKey ? activeSession : null;
+      const draftPlanToday = draftPlan?.date === todayKey ? draftPlan : null;
       const createEmptySession = (overrides = {}) => ({
         date: todayKey,
         status: 'draft',
@@ -3726,8 +3837,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         recordDayEntry(todayKey, 'workout', { exercises: Array.from(new Set([...(dayEntries[todayKey]?.exercises || []), ...exercises])) });
       };
 
-      const startActiveSession = () => {
-        setActiveSession(prev => (prev?.date === todayKey ? prev : createEmptySession({ createdFrom: 'manual' })));
+      const createEmptyDraft = () => {
+        createDraft({ label: 'Workout Draft', exercises: [], createdFrom: 'manual', type: todayWorkoutType });
+        setFocusDraft(true);
       };
 
       const finishActiveSession = () => {
@@ -3746,14 +3858,14 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }));
         recordDayEntry(todayKey, 'workout', { sessionSummary: summary });
         setActiveSession(null);
-        setGeneratedWorkout(null);
-        setDismissedGeneratedDate(null);
+        setDraftPlan(null);
+        setDismissedDraftDate(null);
         setActiveEquipment(null);
         setActiveCardio(null);
         pushMessage('Workout saved.');
       };
 
-      const buildGeneratedWorkout = (type, options = {}) => {
+      const buildDraftPlan = (type, options = {}) => {
         const gymType = GYM_TYPES[profile.gymType];
         const planKey = type === 'legs' ? 'Legs' : type === 'push' ? 'Push' : type === 'pull' ? 'Pull' : type === 'full' ? 'Full Body' : todayWorkoutType;
         const plan = WORKOUT_PLANS[planKey] || {};
@@ -3794,74 +3906,51 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         return { type, label: planKey === 'Full Body' ? 'Full Body' : `${planKey} Day`, exercises: picks, options: sanitizedOptions };
       };
 
-      const attachGeneratedSession = (generated) => {
-        setActiveSession(prev => {
-          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
-          const items = generated.exercises.map(id => {
-            const existing = (base.items || []).find(item => item.id === id);
-            return {
-              id,
-              label: EQUIPMENT_DB[id]?.name || 'Exercise',
-              sets: existing?.sets || 0,
-              kind: 'strength'
-            };
-          });
-          return {
-            ...base,
-            date: todayKey,
-            status: base.status === 'in_progress' ? 'in_progress' : 'draft',
-            createdFrom: 'generated',
-            items
-          };
-        });
+      const createDraft = (draft) => {
+        const resolved = {
+          date: todayKey,
+          label: draft?.label || 'Workout Draft',
+          exercises: draft?.exercises || [],
+          options: draft?.options || {},
+          status: 'draft',
+          createdFrom: draft?.createdFrom || 'manual',
+          type: draft?.type || todayWorkoutType
+        };
+        setDraftPlan(resolved);
+        setDismissedDraftDate(null);
       };
 
       const triggerGenerator = (type) => {
         const chosen = type === 'surprise' ? ['legs','push','pull','full'][Math.floor(Math.random()*4)] : type;
-        const generated = buildGeneratedWorkout(chosen, generatorOptions || {});
-        setGeneratedWorkout(generated);
-        attachGeneratedSession(generated);
-        setDismissedGeneratedDate(null);
+        const draft = buildDraftPlan(chosen, generatorOptions || {});
+        createDraft({ ...draft, createdFrom: 'generated' });
         setTab('workout');
+        setFocusDraft(true);
       };
 
-      const regenerateGeneratedWorkout = () => {
-        if (!generatedWorkout) return;
+      const regenerateDraftPlan = () => {
+        if (!draftPlan) return;
         const hasOptions = generatorOptions?.goal || generatorOptions?.duration || generatorOptions?.equipment;
-        const regenerated = buildGeneratedWorkout(generatedWorkout.type, hasOptions ? generatorOptions : (generatedWorkout.options || {}));
-        setGeneratedWorkout(regenerated);
-        attachGeneratedSession(regenerated);
+        const regenerated = buildDraftPlan(draftPlan.type, hasOptions ? generatorOptions : (draftPlan.options || {}));
+        createDraft({ ...regenerated, createdFrom: 'generated' });
+        setFocusDraft(true);
       };
 
-      const swapGeneratedExercise = (index, newId) => {
-        setGeneratedWorkout(prev => {
+      const swapDraftExercise = (index, newId) => {
+        setDraftPlan(prev => {
           if (!prev) return prev;
           const updated = [...prev.exercises];
           updated[index] = newId;
           return { ...prev, exercises: updated };
         });
-        setActiveSession(prev => {
-          if (!prev || prev.date !== todayKey || prev.createdFrom !== 'generated') return prev;
-          const items = [...(prev.items || [])];
-          if (items.length <= index) return prev;
-          const target = items[index];
-          const updatedItem = {
-            id: newId,
-            label: EQUIPMENT_DB[newId]?.name || 'Exercise',
-            sets: target?.sets || 0,
-            kind: 'strength'
-          };
-          items[index] = updatedItem;
-          return { ...prev, items };
-        });
       };
 
-      const startGeneratedWorkout = () => {
-        if (!generatedWorkout) return;
-        ensureWorkoutDayEntry(generatedWorkout.exercises);
+      const startDraftWorkout = () => {
+        if (!draftPlan) return;
+        ensureWorkoutDayEntry(draftPlan.exercises);
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
-          const items = generatedWorkout.exercises.map(id => {
+          const items = (draftPlan.exercises || []).map(id => {
             const existing = (base.items || []).find(item => item.id === id);
             return {
               id,
@@ -3872,7 +3961,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           });
           return { ...base, status: 'in_progress', createdFrom: 'generated', items };
         });
-        setActiveEquipment(generatedWorkout.exercises[0]);
+        setDraftPlan(null);
+        setDismissedDraftDate(null);
+        setActiveEquipment((draftPlan.exercises || [])[0] || null);
       };
 
       const handleLogRestDay = () => {
@@ -3889,7 +3980,19 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setTab('workout');
       };
 
-      const handleSelectEquipment = (id) => {
+      const addExerciseToDraft = (id) => {
+        if (!id) return;
+        createDraft({
+          label: draftPlanToday?.label || 'Workout Draft',
+          exercises: Array.from(new Set([...(draftPlanToday?.exercises || []), id])),
+          createdFrom: draftPlanToday?.createdFrom || 'manual',
+          type: draftPlanToday?.type || todayWorkoutType,
+          options: draftPlanToday?.options || {}
+        });
+        setFocusDraft(true);
+      };
+
+      const addExerciseToSession = (id) => {
         if (!id) return;
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
@@ -3897,9 +4000,22 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           if (!items.find(item => item.id === id)) {
             items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
           }
-          return { ...base, items };
+          return { ...base, status: 'in_progress', items };
         });
         setActiveEquipment(id);
+      };
+
+      const handleSelectExercise = (id, mode, options = {}) => {
+        if (options.createDraftOnly) {
+          createEmptyDraft();
+          return;
+        }
+        if (!id) return;
+        if (mode === 'session') {
+          addExerciseToSession(id);
+          return;
+        }
+        addExerciseToDraft(id);
       };
 
       const handleSaveSession = (id, session) => {
@@ -3995,8 +4111,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           setExerciseUsageCounts({});
           setDayEntries({});
           setLastExerciseStats({});
-          setGeneratedWorkout(null);
-          setDismissedGeneratedDate(null);
+          setDraftPlan(null);
+          setDismissedDraftDate(null);
           storage.set('ps_v2_profile', null);
           storage.set('ps_v2_history', {});
           storage.set('ps_v2_cardio', {});
@@ -4004,8 +4120,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           storage.set('ps_v2_settings', { insightsEnabled: true, darkMode: false, darkAccent: 'purple', showAllExercises: false, pinnedExercises: [], workoutViewMode: 'all', suggestedWorkoutCollapsed: true });
           storage.set(STORAGE_KEY, { version: STORAGE_VERSION, pinnedExercises: [], recentExercises: [], exerciseUsageCounts: {}, dayEntries: {}, lastExerciseStats: {} });
           storage.set(ONBOARDING_KEY, false);
-          storage.set('ps_dismissed_generated_workout_date', null);
+          storage.set('ps_dismissed_draft_date', null);
           storage.set(ACTIVE_SESSION_KEY, null);
+          storage.set(DRAFT_SESSION_KEY, null);
         }
       };
 
@@ -4188,18 +4305,15 @@ return (
                       onStartWorkout={handleStartWorkout}
                       onGenerate={triggerGenerator}
                       quoteIndex={quoteIndex}
-                      onRefreshQuote={() => setQuoteIndex((prev) => (prev + 1) % motivationalQuotes.length)}
                       lastWorkoutLabel={lastWorkoutLabel}
                       activeSession={activeSessionToday}
-                      generatorOptions={generatorOptions}
-                      setGeneratorOptions={setGeneratorOptions}
                     />
                   )}
                   {tab === 'workout' && (
                     <Workout
                       profile={profile}
                       history={history}
-                      onEquipmentSelect={handleSelectEquipment}
+                      onSelectExercise={handleSelectExercise}
                       onOpenCardio={(type) => setActiveCardio(type)}
                       settings={settings}
                       setSettings={setSettings}
@@ -4207,21 +4321,22 @@ return (
                       pinnedExercises={pinnedExercises}
                       setPinnedExercises={setPinnedExercises}
                       recentExercises={recentExercises}
-                      generatedWorkout={generatedWorkout}
-                      onRegenerateGeneratedWorkout={regenerateGeneratedWorkout}
-                      onSwapGeneratedExercise={swapGeneratedExercise}
-                      onStartGeneratedWorkout={startGeneratedWorkout}
+                      draftPlan={draftPlanToday}
+                      onRegenerateDraft={regenerateDraftPlan}
+                      onSwapDraftExercise={swapDraftExercise}
+                      onStartDraftWorkout={startDraftWorkout}
+                      onHideDraft={(value) => setDismissedDraftDate(value)}
                       onLogRestDay={handleLogRestDay}
                       restDayLogged={restDayLogged}
                       hasWorkoutToday={hasWorkoutToday}
-                      dismissedGeneratedDate={dismissedGeneratedDate}
-                      setDismissedGeneratedDate={setDismissedGeneratedDate}
+                      dismissedDraftDate={dismissedDraftDate}
                       activeSession={activeSessionToday}
-                      onStartSession={startActiveSession}
                       onFinishSession={finishActiveSession}
                       activeEquipment={activeEquipment}
                       generatorOptions={generatorOptions}
                       setGeneratorOptions={setGeneratorOptions}
+                      focusDraft={focusDraft}
+                      onDraftFocused={() => setFocusDraft(false)}
                     />
                   )}
                   {tab === 'profile' && (
