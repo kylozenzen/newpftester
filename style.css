@@ -7,6 +7,7 @@
   --surface: #ffffff;
   --surface-2: #f1f3f9;
   --text: #0f1117;
+  --text-strong: #0b0d14;
   --muted: #6b7280;
   --border: #e5e7eb;
   --accent: #8b5cf6;
@@ -28,8 +29,9 @@ body {
 body.dark-mode {
   --bg: #05070d;
   --surface: #0e121c;
-  --surface-2: #111827;
+  --surface-2: #161c2b;
   --text: #e7e9f0;
+  --text-strong: #f3f4f6;
   --muted: #9ca3af;
   --border: #1f2431;
 }
@@ -439,6 +441,103 @@ select:focus-visible {
   border: 1px dashed var(--accent-soft);
   border-radius: 12px;
   padding: 8px;
+}
+
+.theme-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.theme-preview .preview-btn {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  text-align: center;
+  border: none;
+}
+
+.theme-preview .preview-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+}
+
+.theme-preview .preview-card {
+  border: 1px dashed var(--accent-soft);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--surface-2);
+}
+
+.workout-shell .workout-title,
+.workout-shell .workout-heading {
+  color: var(--text-strong);
+}
+
+.workout-shell .workout-muted {
+  color: var(--muted);
+}
+
+.workout-shell .workout-card {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.workout-shell .workout-chip {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+}
+
+.inline-message {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: fadeInMessage 0.4s ease forwards;
+}
+
+.hold-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.hold-button .hold-progress {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 1.1s linear;
+  pointer-events: none;
+}
+
+.hold-button.holding .hold-progress {
+  transform: scaleX(1);
+}
+
+@keyframes fadeInMessage {
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .tabbar {
