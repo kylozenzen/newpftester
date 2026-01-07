@@ -6,8 +6,6 @@ const { useState, useEffect, useMemo, useRef } = React;
     if (manifestLink) manifestLink.setAttribute('href', 'manifest.json');
     const iconLink = document.getElementById('app-icon');
     if (iconLink) iconLink.setAttribute('href', 'icons/icon-192.svg');
-    const appleIcon = document.getElementById('apple-icon');
-    if (appleIcon) appleIcon.setAttribute('href', 'icons/icon-192.svg');
 
     // Register service worker
     // Register service worker only on supported origins (not file://)
@@ -1454,10 +1452,10 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, last
   );
 };
 
-const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused }) => {
+const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused, onRemoveSessionExercise, onSwapSessionExercise, sessionStartNotice }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
-  const [swapIndex, setSwapIndex] = useState(null);
+  const [swapState, setSwapState] = useState(null);
   const [holdingFinish, setHoldingFinish] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [draftCollapsed, setDraftCollapsed] = useState(false);
@@ -1496,6 +1494,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
   const sessionHasLogged = sessionEntries.some(entry => entry.sets > 0);
   const canFinish = activeSession && (activeSession.status === 'in_progress' || sessionHasLogged);
   const isSessionMode = activeSession?.status === 'in_progress';
+  const hasSession = !!activeSession;
   const isPlanMode = !isSessionMode;
   const canHideDraft = draftPlan && !sessionHasLogged;
   const shouldHideDraft = draftHidden && canHideDraft;
@@ -1665,7 +1664,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
     );
   };
 
-  const renderExerciseTile = (id) => {
+  const renderExerciseTile = (id, source = 'default') => {
     const eq = EQUIPMENT_DB[id];
     if (!eq) return null;
     const pinned = pinnedExercises.includes(id);
@@ -1673,7 +1672,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
     return (
       <button
         key={id}
-        onClick={() => onSelectExercise(id, isSessionMode ? 'session' : 'plan')}
+        onClick={() => onSelectExercise(id, source === 'library' ? 'library' : (isSessionMode ? 'session' : 'plan'))}
         className="tile text-left active:scale-[0.98] transition"
       >
         <div className="flex items-center justify-between mb-1">
@@ -1692,12 +1691,15 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
   };
 
   const swapOptions = useMemo(() => {
-    if (swapIndex === null || !draftPlan) return [];
-    const currentId = draftPlan.exercises[swapIndex];
+    if (!swapState) return [];
+    const isDraftSwap = swapState.mode === 'draft';
+    const sourceList = isDraftSwap ? (draftPlan?.exercises || []) : sessionEntries.map(entry => entry.id);
+    const currentId = sourceList[swapState.index];
+    if (!currentId) return [];
     const current = EQUIPMENT_DB[currentId];
     const pool = availableEquipment.filter(id => id !== currentId && (!current || (EQUIPMENT_DB[id]?.target === current.target || EQUIPMENT_DB[id]?.tags?.some(t => current.tags?.includes(t)))));
     return pool.slice(0, 20);
-  }, [swapIndex, draftPlan, availableEquipment]);
+  }, [swapState, draftPlan, availableEquipment, sessionEntries]);
 
   const handleDraftRemove = (index) => {
     onRemoveDraftExercise?.(index);
@@ -1778,7 +1780,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-28 px-4 pt-6 space-y-4">
+      <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4 workout-scroll">
         {isPlanMode && !searchQuery && (
           <div className="text-sm text-gray-500 font-semibold">{welcomeMessage}</div>
         )}
@@ -1798,15 +1800,15 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </div>
         )}
 
-        {isSessionMode && activeSession && (
+        {hasSession && activeSession && (
           <Card className="space-y-3 workout-card" ref={sessionCardRef}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold workout-muted uppercase">Workout in progress</div>
+                <div className="text-xs font-bold workout-muted uppercase">{isSessionMode ? 'Workout in progress' : 'Draft session'}</div>
                 <div className="text-lg font-black workout-heading">Today’s Session</div>
-                <div className="text-[11px] workout-muted">Log as you go</div>
+                <div className="text-[11px] workout-muted">{isSessionMode ? 'Log as you go' : 'Edit and start when ready'}</div>
               </div>
-              {canFinish && (
+              {isSessionMode && canFinish && (
                 <button
                   onMouseDown={startFinishHold}
                   onMouseUp={cancelFinishHold}
@@ -1821,17 +1823,44 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                 </button>
               )}
             </div>
+            {sessionStartNotice && isSessionMode && (
+              <div className="session-inline-message">{sessionStartNotice}</div>
+            )}
             {sessionEntries.length === 0 ? (
               <div className="text-xs workout-muted">Session ready. Add exercises as you go.</div>
             ) : (
               <div className="space-y-2">
-                {sessionEntries.map(entry => (
-                  <div key={entry.id} className="flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-white">
+                {sessionEntries.map((entry, idx) => (
+                  <div
+                    key={entry.id}
+                    onClick={() => onSelectExercise(entry.id, 'session')}
+                    className="session-entry-row"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onSelectExercise(entry.id, 'session'); }}
+                  >
                     <div>
                       <div className="text-sm font-bold workout-heading">{entry.label}</div>
                       <div className="text-[11px] workout-muted">{entry.kind === 'cardio' ? 'Cardio' : 'Strength'}</div>
                     </div>
-                    <div className="text-xs font-bold text-purple-600">{entry.sets} {entry.kind === 'cardio' ? 'entries' : 'sets'}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs font-bold text-purple-600">{entry.sets} {entry.kind === 'cardio' ? 'entries' : 'sets'}</div>
+                      {activeSession?.createdFrom === 'generated' && entry.kind !== 'cardio' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSwapState({ mode: 'session', index: idx }); }}
+                          className="session-action-button"
+                        >
+                          Swap
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRemoveSessionExercise?.(entry.id); }}
+                        className="session-remove-button"
+                        aria-label={`Remove ${entry.label}`}
+                      >
+                        <Icon name="Trash" className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1896,7 +1925,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                           <button onClick={() => togglePin(id)} className={`px-2 py-1 rounded-full text-xs font-bold ${pinnedExercises.includes(id) ? 'workout-chip' : 'bg-gray-100 text-gray-500'}`}>
                             {pinnedExercises.includes(id) ? 'Pinned' : 'Pin'}
                           </button>
-                          <button onClick={() => setSwapIndex(idx)} className="px-3 py-1 rounded-full border border-purple-200 text-purple-700 text-xs font-bold">Swap</button>
+                          <button onClick={() => setSwapState({ mode: 'draft', index: idx })} className="px-3 py-1 rounded-full border border-purple-200 text-purple-700 text-xs font-bold">Swap</button>
                           <div className="relative">
                             <button
                               onClick={() => setDraftMenuIndex(prev => (prev === idx ? null : idx))}
@@ -1941,7 +1970,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                 }}
                 className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98]"
               >
-                Start workout
+                Start This Workout
               </button>
             </Card>
           )}
@@ -1992,7 +2021,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               ))}
             </div>
             <div className="exercise-grid">
-              {filteredPool.map(renderExerciseTile)}
+              {filteredPool.map(id => renderExerciseTile(id, 'library'))}
             </div>
           </Card>
         )}
@@ -2033,12 +2062,12 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
         </div>
       )}
 
-      {swapIndex !== null && (
-        <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={() => setSwapIndex(null)}>
+      {swapState !== null && (
+        <div className="fixed inset-0 bg-black/60 z-[120] flex items-end justify-center" onClick={() => setSwapState(null)}>
           <div className="bg-white w-full max-w-md rounded-t-3xl p-4 animate-slide-up" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '80vh' }}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-bold text-gray-900">Swap Exercise</h3>
-              <button onClick={() => setSwapIndex(null)} className="p-2 rounded-full bg-gray-100 text-gray-600">
+              <button onClick={() => setSwapState(null)} className="p-2 rounded-full bg-gray-100 text-gray-600">
                 <Icon name="X" className="w-4 h-4" />
               </button>
             </div>
@@ -2046,7 +2075,14 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               {swapOptions.map(id => (
                 <button
                   key={id}
-                  onClick={() => { onSwapDraftExercise(swapIndex, id); setSwapIndex(null); }}
+                  onClick={() => {
+                    if (swapState?.mode === 'session') {
+                      onSwapSessionExercise?.(swapState.index, id);
+                    } else {
+                      onSwapDraftExercise?.(swapState.index, id);
+                    }
+                    setSwapState(null);
+                  }}
                   className="w-full p-3 rounded-xl border border-gray-200 text-left bg-gray-50 active:scale-[0.98]"
                 >
                   <div className="font-bold text-gray-900 text-sm">{EQUIPMENT_DB[id]?.name}</div>
@@ -3526,6 +3562,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [inlineMessage, setInlineMessage] = useState(null);
       const messageTimerRef = useRef(null);
       const [focusSession, setFocusSession] = useState(false);
+      const [sessionStartNotice, setSessionStartNotice] = useState(null);
+      const sessionStartTimerRef = useRef(null);
 
       const [appState, setAppState] = useState({
         lastWorkoutType: null,
@@ -3713,6 +3751,15 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         };
       }, []);
 
+      useEffect(() => {
+        if (!sessionStartNotice) return;
+        if (sessionStartTimerRef.current) clearTimeout(sessionStartTimerRef.current);
+        sessionStartTimerRef.current = setTimeout(() => setSessionStartNotice(null), 4000);
+        return () => {
+          if (sessionStartTimerRef.current) clearTimeout(sessionStartTimerRef.current);
+        };
+      }, [sessionStartNotice]);
+
       const pushMessage = (text) => {
         if (!text) return;
         setInlineMessage(text);
@@ -3819,6 +3866,26 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         ...overrides
       });
 
+      const buildSessionItemsFromIds = (ids = [], baseItems = []) => {
+        return ids.map(id => {
+          const existing = baseItems.find(item => item.id === id);
+          return existing ? { ...existing, label: EQUIPMENT_DB[id]?.name || existing.label || 'Exercise', kind: existing.kind || 'strength' } : {
+            id,
+            label: EQUIPMENT_DB[id]?.name || 'Exercise',
+            sets: 0,
+            kind: 'strength'
+          };
+        });
+      };
+
+      const updateDraftPlanExercises = (updater) => {
+        setDraftPlan(prev => {
+          if (!prev || prev.date !== todayKey) return prev;
+          const nextExercises = updater(prev.exercises || []);
+          return { ...prev, exercises: nextExercises };
+        });
+      };
+
       const updateActiveSession = (entry) => {
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
@@ -3826,7 +3893,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           const idx = items.findIndex(item => item.id === entry.id);
           if (idx >= 0) {
             const existing = items[idx];
-            items[idx] = { ...existing, ...entry, sets: (existing.sets || 0) + (entry.sets || 0) };
+            const resolvedSets = entry.sets !== undefined ? entry.sets : (existing.sets || 0);
+            items[idx] = { ...existing, ...entry, sets: resolvedSets };
           } else {
             items.push({ ...entry });
           }
@@ -3841,6 +3909,31 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const ensureWorkoutDayEntry = (exercises = []) => {
         if (!profile.onboarded) return;
         recordDayEntry(todayKey, 'workout', { exercises: Array.from(new Set([...(dayEntries[todayKey]?.exercises || []), ...exercises])) });
+      };
+
+      const removeExerciseLogsForToday = (exerciseId, kind = 'strength') => {
+        if (kind === 'cardio' && exerciseId.startsWith('cardio_')) {
+          const cardioType = exerciseId.replace('cardio_', '');
+          setCardioHistory(prev => {
+            const existing = prev[cardioType] || [];
+            const updated = existing.filter(s => toDayKey(new Date(s.date)) !== todayKey);
+            if (updated.length === existing.length) return prev;
+            return { ...prev, [cardioType]: updated };
+          });
+        }
+        setHistory(prev => {
+          const existing = prev[exerciseId] || [];
+          const updated = existing.filter(s => toDayKey(new Date(s.date)) !== todayKey);
+          if (updated.length === existing.length) return prev;
+          return { ...prev, [exerciseId]: updated };
+        });
+        setDayEntries(prev => {
+          const todayEntry = prev[todayKey];
+          if (!todayEntry?.exercises) return prev;
+          const updated = todayEntry.exercises.filter(id => id !== exerciseId);
+          if (updated.length === todayEntry.exercises.length) return prev;
+          return { ...prev, [todayKey]: { ...todayEntry, exercises: updated } };
+        });
       };
 
       const createEmptyDraft = () => {
@@ -3868,6 +3961,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setDismissedDraftDate(null);
         setActiveEquipment(null);
         setActiveCardio(null);
+        setSessionStartNotice(null);
         pushMessage('Workout saved.');
       };
 
@@ -3930,6 +4024,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const chosen = type === 'surprise' ? ['legs','push','pull','full'][Math.floor(Math.random()*4)] : type;
         const draft = buildDraftPlan(chosen, generatorOptions || {});
         createDraft({ ...draft, createdFrom: 'generated' });
+        if (activeSessionToday?.status !== 'in_progress') {
+          setActiveSession(prev => {
+            const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
+            const items = buildSessionItemsFromIds(draft.exercises || [], base.items || []);
+            return { ...base, status: 'draft', createdFrom: 'generated', items };
+          });
+        }
         setTab('workout');
         setFocusDraft(true);
       };
@@ -3943,20 +4044,53 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const swapDraftExercise = (index, newId) => {
+        const currentId = draftPlanToday?.exercises?.[index];
+        const existingEntry = activeSessionToday?.items?.find(item => item.id === currentId);
+        if (existingEntry?.sets > 0) {
+          const confirmed = window.confirm('Swap this exercise? Logged sets for it will be removed from today’s session.');
+          if (!confirmed) return;
+          removeExerciseLogsForToday(currentId, existingEntry.kind);
+        }
         setDraftPlan(prev => {
           if (!prev) return prev;
           const updated = [...prev.exercises];
           updated[index] = newId;
           return { ...prev, exercises: updated };
         });
+        setActiveSession(prev => {
+          if (!prev || prev.date !== todayKey) return prev;
+          const items = [...(prev.items || [])];
+          if (items[index]) {
+            items[index] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
+          } else if (currentId) {
+            const idx = items.findIndex(item => item.id === currentId);
+            if (idx >= 0) {
+              items[idx] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
+            }
+          }
+          return { ...prev, items };
+        });
       };
 
       const removeDraftExercise = (index) => {
+        const currentId = draftPlanToday?.exercises?.[index];
+        const existingEntry = activeSessionToday?.items?.find(item => item.id === currentId);
+        if (existingEntry?.sets > 0) {
+          const confirmed = window.confirm('Remove this exercise from today’s session? Logged sets will be removed from this session.');
+          if (!confirmed) return;
+          removeExerciseLogsForToday(currentId, existingEntry.kind);
+        }
         setDraftPlan(prev => {
           if (!prev) return prev;
           const updated = prev.exercises.filter((_, idx) => idx !== index);
           return { ...prev, exercises: updated };
         });
+        if (currentId) {
+          setActiveSession(prev => {
+            if (!prev || prev.date !== todayKey) return prev;
+            return { ...prev, items: (prev.items || []).filter(item => item.id !== currentId) };
+          });
+        }
       };
 
       const clearDraftPlan = () => {
@@ -3969,21 +4103,15 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         ensureWorkoutDayEntry(plan.exercises || []);
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: plan.createdFrom || 'manual' }) : prev;
-          const items = (plan.exercises || []).map(id => {
-            const existing = (base.items || []).find(item => item.id === id);
-            return {
-              id,
-              label: EQUIPMENT_DB[id]?.name || 'Exercise',
-              sets: existing?.sets || 0,
-              kind: 'strength'
-            };
-          });
-          return { ...base, status: 'in_progress', createdFrom: plan.createdFrom || 'manual', items };
+          const baseItems = base.items || [];
+          const combinedIds = Array.from(new Set([...(baseItems.map(item => item.id)), ...(plan.exercises || [])]));
+          const items = buildSessionItemsFromIds(combinedIds, baseItems);
+          return { ...base, status: 'in_progress', createdFrom: plan.createdFrom || base.createdFrom || 'manual', items };
         });
         setDraftPlan(null);
         setDismissedDraftDate(null);
         setFocusSession(true);
-        pushMessage('Session started. Add exercises as you go.');
+        setSessionStartNotice('Session started. Add exercises as you go.');
       };
 
       const handleLogRestDay = () => {
@@ -4017,31 +4145,36 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           options: draftPlanToday?.options || {}
         });
         setFocusDraft(true);
+        setActiveSession(prev => {
+          if (!prev || prev.date !== todayKey || prev.status === 'in_progress') return prev;
+          const items = [...(prev.items || [])];
+          if (!items.find(item => item.id === id)) {
+            items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
+          }
+          return { ...prev, items };
+        });
       };
 
-      const addExerciseToSession = (id) => {
+      const addExerciseToSession = (id, options = {}) => {
         if (!id) return;
         setActiveSession(prev => {
-          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: options.createdFrom || 'manual' }) : prev;
           const items = [...(base.items || [])];
           if (!items.find(item => item.id === id)) {
             items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
           }
-          return { ...base, status: 'in_progress', items };
+          const nextStatus = options.status || base.status;
+          return { ...base, status: nextStatus, createdFrom: base.createdFrom || options.createdFrom || 'manual', items };
         });
-        setActiveEquipment(id);
+        if (options.open) {
+          setActiveEquipment(id);
+        }
       };
 
       const addExerciseFromSearch = (id) => {
         if (!id) return;
-        setActiveSession(prev => {
-          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
-          const items = [...(base.items || [])];
-          if (!items.find(item => item.id === id)) {
-            items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
-          }
-          return { ...base, status: base.status === 'in_progress' ? 'in_progress' : 'draft', items };
-        });
+        addExerciseToSession(id, { status: activeSessionToday?.status === 'in_progress' ? 'in_progress' : 'draft' });
+        updateDraftPlanExercises(prev => Array.from(new Set([...prev, id])));
       };
 
       const handleSelectExercise = (id, mode, options = {}) => {
@@ -4051,10 +4184,59 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }
         if (!id) return;
         if (mode === 'session') {
-          addExerciseToSession(id);
+          addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', open: true });
+          return;
+        }
+        if (mode === 'library') {
+          addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', open: true, createdFrom: draftPlanToday?.createdFrom || activeSessionToday?.createdFrom || 'manual' });
+          updateDraftPlanExercises(prev => Array.from(new Set([...prev, id])));
           return;
         }
         addExerciseToDraft(id);
+      };
+
+      const removeSessionExercise = (id) => {
+        if (!id || !activeSessionToday) return;
+        const entry = activeSessionToday.items?.find(item => item.id === id);
+        const hasLoggedSets = entry?.sets > 0;
+        if (hasLoggedSets) {
+          const confirmed = window.confirm('Remove this exercise from today’s session? Logged sets will be removed from this session.');
+          if (!confirmed) return;
+          removeExerciseLogsForToday(id, entry.kind);
+        }
+        setActiveSession(prev => {
+          if (!prev || prev.date !== todayKey) return prev;
+          return { ...prev, items: (prev.items || []).filter(item => item.id !== id) };
+        });
+        updateDraftPlanExercises(prev => prev.filter(exId => exId !== id));
+      };
+
+      const swapSessionExercise = (index, newId) => {
+        if (!activeSessionToday) return;
+        const entry = activeSessionToday.items?.[index];
+        if (!entry) return;
+        if (entry.sets > 0) {
+          const confirmed = window.confirm('Swap this exercise? Logged sets for it will be removed from today’s session.');
+          if (!confirmed) return;
+          removeExerciseLogsForToday(entry.id, entry.kind);
+        }
+        setActiveSession(prev => {
+          if (!prev || prev.date !== todayKey) return prev;
+          const items = [...(prev.items || [])];
+          if (!items[index]) return prev;
+          items[index] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
+          return { ...prev, items };
+        });
+        updateDraftPlanExercises(prev => {
+          const updated = [...prev];
+          if (updated[index]) {
+            updated[index] = newId;
+            return updated;
+          }
+          const fallbackIndex = updated.findIndex(exId => exId === entry.id);
+          if (fallbackIndex >= 0) updated[fallbackIndex] = newId;
+          return updated;
+        });
       };
 
       const handleSaveSession = (id, session) => {
@@ -4387,6 +4569,9 @@ return (
                       onPushMessage={pushMessage}
                       focusSession={focusSession}
                       onSessionFocused={() => setFocusSession(false)}
+                      onRemoveSessionExercise={removeSessionExercise}
+                      onSwapSessionExercise={swapSessionExercise}
+                      sessionStartNotice={sessionStartNotice}
                     />
                   )}
                   {tab === 'profile' && (
