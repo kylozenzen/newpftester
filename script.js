@@ -1340,8 +1340,74 @@ const OnboardingFlow = ({ profile, setProfile, onFinish }) => {
 
     // ========== HOME SCREEN ==========
     
-const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRefreshQuote }) => {
+const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
+  const goalOptions = [
+    { id: 'strength', label: 'Strength' },
+    { id: 'hypertrophy', label: 'Hypertrophy' },
+    { id: 'quick', label: 'Quick' }
+  ];
+  const durationOptions = [30, 45, 60];
+  const equipmentOptions = [
+    { id: 'machines', label: 'Machines' },
+    { id: 'free', label: 'Free weights' },
+    { id: 'mixed', label: 'Mixed' }
+  ];
+
+  const toggleOption = (key, value) => {
+    onUpdate(prev => ({ ...prev, [key]: prev[key] === value ? '' : value }));
+  };
+
+  return (
+    <div className={`space-y-2 ${compact ? 'text-xs' : ''}`}>
+      <div className="text-[11px] font-bold text-gray-500 uppercase">Optional tweaks</div>
+      <div className="flex flex-wrap gap-2">
+        {goalOptions.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => toggleOption('goal', opt.id)}
+            className={`filter-chip ${options.goal === opt.id ? 'active' : ''}`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {durationOptions.map(value => (
+          <button
+            key={value}
+            onClick={() => toggleOption('duration', value)}
+            className={`filter-chip ${options.duration === value ? 'active' : ''}`}
+          >
+            {value} min
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {equipmentOptions.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => toggleOption('equipment', opt.id)}
+            className={`filter-chip ${options.equipment === opt.id ? 'active' : ''}`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRefreshQuote, lastWorkoutLabel, activeSession, generatorOptions, setGeneratorOptions }) => {
   const quote = motivationalQuotes[quoteIndex % motivationalQuotes.length];
+  const homeMessages = [
+    'Keep it simple today.',
+    'Small steps add up.',
+    'Ready when you are.',
+    'Show up for yourself.'
+  ];
+  const subMessage = homeMessages[quoteIndex % homeMessages.length];
+  const isResuming = activeSession?.status === 'in_progress';
+  const loggedCount = (activeSession?.items || []).filter(item => item.sets > 0).length;
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -1358,52 +1424,41 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-        <Card
-          className="relative"
-          style={{
-            background: 'linear-gradient(145deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 5%, transparent))',
-            border: '1px solid var(--accent-soft)',
-            boxShadow: '0 16px 42px var(--accent-soft)'
-          }}
-        >
-          <button
-            onClick={onRefreshQuote}
-            className="absolute top-3 right-3 p-2 rounded-full bg-white/70 text-purple-700 hover:bg-white"
-            aria-label="Refresh quote"
-          >
-            <Icon name="RefreshCw" className="w-4 h-4" />
-          </button>
-          <div className="text-sm font-medium italic leading-relaxed text-purple-900 dark-mode-quote-text">
-            “{quote.quote}”
-          </div>
-          <div className="text-xs font-semibold mt-2 text-purple-600 dark-mode-quote-author">
-            — {quote.author}
-          </div>
-        </Card>
+        <div className="text-sm text-gray-500 font-semibold">{subMessage}</div>
 
-        <Card className="flex items-center justify-between" style={{ background: 'linear-gradient(90deg, rgba(251, 191, 36, 0.15), rgba(234, 88, 12, 0.12))' }}>
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">🔥</div>
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="flex items-center gap-3">
+            <div className="text-2xl">🔥</div>
             <div>
-              <div className="text-sm font-semibold text-gray-600 uppercase">Streak</div>
-              <div className="text-2xl font-black text-orange-600">{streakObj.current} days</div>
-              <div className="text-xs text-gray-500">Best: {streakObj.best} days</div>
+              <div className="text-xs font-semibold text-gray-500 uppercase">Streak</div>
+              <div className="text-xl font-black text-orange-600">{streakObj.current} days</div>
+              <div className="text-[11px] text-gray-500">Best: {streakObj.best}</div>
             </div>
-          </div>
+          </Card>
+
+          <Card className="flex items-center gap-3">
+            <div className="text-2xl">🗓️</div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase">Last workout</div>
+              <div className="text-sm font-black text-gray-900">{lastWorkoutLabel || 'First workout?'}</div>
+              <div className="text-[11px] text-gray-500">{lastWorkoutLabel ? 'Keep the streak calm.' : 'Log one today.'}</div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-1">
           <button
             onClick={onStartWorkout}
-            className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold shadow active:scale-95 transition-all"
+            className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-lg shadow-lg active:scale-95 transition-all"
           >
-            Start
+            {isResuming ? 'Resume Workout' : 'Start Workout'}
           </button>
-        </Card>
-
-        <button
-          onClick={onStartWorkout}
-          className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-lg shadow-lg active:scale-95 transition-all"
-        >
-          Start Workout
-        </button>
+          {isResuming && (
+            <div className="text-xs text-gray-500 font-semibold text-center">
+              {loggedCount > 0 ? `${loggedCount} exercises logged so far` : 'Workout in progress'}
+            </div>
+          )}
+        </div>
 
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
@@ -1430,8 +1485,25 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
               </button>
             ))}
           </div>
+          <GeneratorOptions options={generatorOptions} onUpdate={setGeneratorOptions} />
           <div className="text-[11px] text-gray-500">
-            Generated workouts will open in the Workout tab for quick edits.
+            Generated workouts open in the Workout tab for quick edits.
+          </div>
+        </Card>
+
+        <Card className="relative quote-card">
+          <button
+            onClick={onRefreshQuote}
+            className="absolute top-3 right-3 p-2 rounded-full bg-white/70 text-purple-700 hover:bg-white"
+            aria-label="Refresh quote"
+          >
+            <Icon name="RefreshCw" className="w-4 h-4" />
+          </button>
+          <div className="text-sm font-medium italic leading-relaxed text-purple-900 dark-mode-quote-text">
+            “{quote.quote}”
+          </div>
+          <div className="text-xs font-semibold mt-2 text-purple-600 dark-mode-quote-author">
+            — {quote.author}
           </div>
         </Card>
       </div>
@@ -1439,11 +1511,13 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, onRe
   );
 };
 
-const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, generatedWorkout, onRegenerateGeneratedWorkout, onSwapGeneratedExercise, onStartGeneratedWorkout, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedGeneratedDate, setDismissedGeneratedDate, activeSession, onStartSession, onFinishSession, activeEquipment }) => {
+const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, generatedWorkout, onRegenerateGeneratedWorkout, onSwapGeneratedExercise, onStartGeneratedWorkout, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedGeneratedDate, setDismissedGeneratedDate, activeSession, onStartSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapIndex, setSwapIndex] = useState(null);
   const [holdingFinish, setHoldingFinish] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [generatedCollapsed, setGeneratedCollapsed] = useState(false);
   const holdTimerRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -1465,15 +1539,49 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
   const todayKey = toDayKey(new Date());
   const generatedHidden = dismissedGeneratedDate === todayKey;
   const sessionEntries = useMemo(() => {
-    if (!activeSession || activeSession.dateKey !== todayKey) return [];
-    return Object.values(activeSession.exercises || {});
+    if (!activeSession || activeSession.date !== todayKey) return [];
+    return activeSession.items || [];
   }, [activeSession, todayKey]);
+  const sessionHasLogged = sessionEntries.some(entry => entry.sets > 0);
+  const canFinish = activeSession && (activeSession.status === 'in_progress' || sessionHasLogged);
+  const canHideGenerated = generatedWorkout && !sessionHasLogged;
+  const shouldHideGenerated = generatedHidden && canHideGenerated;
+
+  const filterOptions = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Pinned'];
+
+  const resolveGroup = (eq) => {
+    const target = (eq?.target || '').toLowerCase();
+    if (target.includes('chest') || target.includes('pec')) return 'Chest';
+    if (target.includes('back') || target.includes('lat')) return 'Back';
+    if (target.includes('leg') || target.includes('quad') || target.includes('hamstring') || target.includes('glute') || target.includes('calf') || target.includes('thigh')) return 'Legs';
+    if (target.includes('shoulder') || target.includes('delt')) return 'Shoulders';
+    if (target.includes('bicep') || target.includes('tricep') || target.includes('arm') || target.includes('forearm')) return 'Arms';
+    if (target.includes('core') || target.includes('ab')) return 'Core';
+    return 'Other';
+  };
+
+  const formatOptionLabel = (value, type) => {
+    if (!value) return '';
+    if (type === 'equipment') {
+      if (value === 'free') return 'Free weights';
+      if (value === 'machines') return 'Machines';
+      if (value === 'mixed') return 'Mixed';
+    }
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
+  const filteredPool = useMemo(() => {
+    if (activeFilter === 'All') return availableEquipment;
+    if (activeFilter === 'Pinned') return filteredPinned;
+    if (activeFilter === 'Cardio') return [];
+    return availableEquipment.filter(id => resolveGroup(EQUIPMENT_DB[id]) === activeFilter);
+  }, [activeFilter, availableEquipment, filteredPinned]);
 
   const searchResults = useMemo(() => {
-    const pool = availableEquipment;
+    const pool = filteredPool;
     if (!searchQuery.trim()) return [];
     return fuzzyMatchExercises(searchQuery, pool);
-  }, [searchQuery, availableEquipment]);
+  }, [searchQuery, filteredPool]);
 
   const togglePin = (id) => {
     const exists = pinnedExercises.includes(id);
@@ -1485,6 +1593,10 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
   useEffect(() => {
     setLibraryVisible(settings.showAllExercises);
   }, [settings.showAllExercises]);
+
+  useEffect(() => {
+    if (!generatedWorkout) setGeneratedCollapsed(false);
+  }, [generatedWorkout]);
 
   useEffect(() => {
     return () => {
@@ -1597,6 +1709,17 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
           </div>
+          <div className="flex flex-wrap gap-2 pt-3">
+            {filterOptions.map(option => (
+              <button
+                key={option}
+                onClick={() => setActiveFilter(option)}
+                className={`filter-chip ${activeFilter === option ? 'active' : ''}`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
           {!libraryVisible && (
             <button
               onClick={() => setLibraryVisible(true)}
@@ -1608,7 +1731,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4">
+      <div className="flex-1 overflow-y-auto pb-28 px-4 pt-4 space-y-4">
         {!activeSession && !activeEquipment && (
           <Card className="space-y-3 workout-card">
             <div className="text-sm font-bold workout-heading">Start here</div>
@@ -1640,20 +1763,22 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
                 <div className="text-xs font-bold workout-muted uppercase">Active Session (Today)</div>
                 <div className="text-lg font-black workout-heading">Today’s session</div>
               </div>
-              <button
-                onMouseDown={startFinishHold}
-                onMouseUp={cancelFinishHold}
-                onMouseLeave={cancelFinishHold}
-                onTouchStart={startFinishHold}
-                onTouchEnd={cancelFinishHold}
-                className={`relative px-3 py-2 rounded-xl text-xs font-bold border border-purple-200 text-purple-700 hold-button ${holdingFinish ? 'holding' : ''}`}
-              >
-                <span className="relative z-10">{holdingFinish ? 'Hold to finish' : 'Finish workout'}</span>
-                <span className="hold-progress" aria-hidden="true"></span>
-              </button>
+              {canFinish && (
+                <button
+                  onMouseDown={startFinishHold}
+                  onMouseUp={cancelFinishHold}
+                  onMouseLeave={cancelFinishHold}
+                  onTouchStart={startFinishHold}
+                  onTouchEnd={cancelFinishHold}
+                  className={`relative px-3 py-2 rounded-xl text-xs font-bold border border-purple-200 text-purple-700 hold-button ${holdingFinish ? 'holding' : ''}`}
+                >
+                  <span className="relative z-10">{holdingFinish ? 'Hold to finish' : 'Finish workout'}</span>
+                  <span className="hold-progress" aria-hidden="true"></span>
+                </button>
+              )}
             </div>
             {sessionEntries.length === 0 ? (
-              <div className="text-xs workout-muted">Session started. Add exercises as you go.</div>
+              <div className="text-xs workout-muted">Session ready. Add exercises as you go.</div>
             ) : (
               <div className="space-y-2">
                 {sessionEntries.map(entry => (
@@ -1670,19 +1795,31 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
           </Card>
         )}
 
-        {generatedWorkout && !generatedHidden && (
+        {generatedWorkout && !shouldHideGenerated && (
           <Card className="space-y-3 border-purple-200 bg-purple-50 workout-card">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs font-bold text-purple-600 uppercase">Generated</div>
                 <div className="text-lg font-black workout-heading">{generatedWorkout.label}</div>
+                <div className="text-[11px] workout-muted">Ready for today • {activeSession?.status === 'in_progress' ? 'In progress' : 'Draft'}</div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { setDismissedGeneratedDate(todayKey); }} className="text-xs font-bold text-gray-500">Hide for today</button>
+                <button
+                  onClick={() => {
+                    if (canHideGenerated) {
+                      setDismissedGeneratedDate(todayKey);
+                    } else {
+                      setGeneratedCollapsed(prev => !prev);
+                    }
+                  }}
+                  className="text-xs font-bold text-gray-500"
+                >
+                  {canHideGenerated ? 'Hide for today' : (generatedCollapsed ? 'Expand' : 'Collapse')}
+                </button>
                 <button onClick={onRegenerateGeneratedWorkout} className="text-sm font-bold text-purple-700">Regenerate</button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className={`space-y-3 ${generatedCollapsed ? 'hidden' : ''}`}>
               {generatedWorkout.exercises.map((id, idx) => {
                 const eq = EQUIPMENT_DB[id];
                 return (
@@ -1700,6 +1837,13 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
                   </div>
                 );
               })}
+              {(generatedWorkout?.options?.goal || generatedWorkout?.options?.duration || generatedWorkout?.options?.equipment) && (
+                <div className="flex flex-wrap gap-2">
+                  {generatedWorkout.options.goal && <span className="filter-chip active">Goal: {formatOptionLabel(generatedWorkout.options.goal)}</span>}
+                  {generatedWorkout.options.duration && <span className="filter-chip active">{generatedWorkout.options.duration} min</span>}
+                  {generatedWorkout.options.equipment && <span className="filter-chip active">{formatOptionLabel(generatedWorkout.options.equipment, 'equipment')}</span>}
+                </div>
+              )}
             </div>
             <button
               onClick={onStartGeneratedWorkout}
@@ -1709,7 +1853,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
             </button>
           </Card>
         )}
-        {generatedWorkout && generatedHidden && (
+        {generatedWorkout && shouldHideGenerated && (
           <Card className="flex items-center justify-between workout-card">
             <div className="text-sm workout-muted">Today’s workout hidden</div>
             <button onClick={() => setDismissedGeneratedDate(null)} className="text-purple-700 font-bold text-sm">Show</button>
@@ -1758,7 +1902,7 @@ const Workout = ({ profile, history, onEquipmentSelect, onOpenCardio, settings, 
               <button onClick={() => setLibraryVisible(false)} className="text-xs text-purple-700 font-bold">Hide</button>
             </div>
             <div className="exercise-grid">
-              {availableEquipment.map(renderExerciseTile)}
+              {filteredPool.map(renderExerciseTile)}
             </div>
           </Card>
         )}
@@ -2178,34 +2322,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               <div className="p-5 space-y-5 h-full">
                 {activeTab === 'workout' ? (
                   <>
-                    {insightsEnabled && (
-                      <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-xs font-bold text-purple-600 uppercase">Personal best</div>
-                            <div className="text-2xl font-black text-gray-900">{best ? `${best} lbs` : '—'}</div>
-                          </div>
-                          {lastSessionInfo && (
-                            <div className="text-right text-xs text-gray-600">
-                              <div className="font-bold text-gray-900">Last time</div>
-                              <div>{lastSessionInfo.weight} lb × {lastSessionInfo.reps}</div>
-                            </div>
-                          )}
-                        </div>
-                        {eq.type === 'barbell' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowPlateCalc(true);
-                            }}
-                            className="w-full mt-1 py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border-2 border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-                          >
-                            🏋️ Plate Calculator
-                          </button>
-                        )}
-                      </div>
-                    )}
-
                     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
                       <button
                         onClick={() => setShowLogger(!showLogger)}
@@ -2220,6 +2336,11 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
 
                       {showLogger && (
                         <div className="px-4 pb-4 space-y-3 animate-expand">
+                          {insightsEnabled && lastSessionInfo && (
+                            <div className="text-[11px] workout-muted">
+                              Last time: {lastSessionInfo.weight} lb × {lastSessionInfo.reps}
+                            </div>
+                          )}
                           {isBaselineMode && (
                             <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200 space-y-3">
                               <div className="flex items-start gap-3">
@@ -2321,6 +2442,17 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                               Add sets fast. You can edit or delete any set below.
                             </div>
                           </div>
+                          {eq.type === 'barbell' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPlateCalc(true);
+                              }}
+                              className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                              🏋️ Plate Calculator
+                            </button>
+                          )}
 
                           <div className="p-3 rounded-2xl bg-white border border-gray-100 space-y-2">
                             <div className="flex items-center justify-between">
@@ -2425,60 +2557,43 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                 ) : (
                   <>
                     <div className="space-y-3">
-                      <div className="bg-white border border-gray-100 rounded-2xl p-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <Icon name="Clock" className="w-5 h-5 text-gray-600"/>
-                            <h3 className="text-xs font-black uppercase text-gray-600">Last Session</h3>
-                          </div>
-                          <div className="text-[10px] text-gray-500 font-semibold">Read-only</div>
-                        </div>
-                        {lastSessionInfo ? (
-                          <div className="text-sm font-semibold text-gray-900">
-                            {new Date(lastSessionInfo.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: {lastSessionInfo.weight} lb × {lastSessionInfo.reps} · {lastSessionInfo.setCount} sets
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">Log one session to see your last numbers.</div>
-                        )}
-                      </div>
-
-                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                      <div className="cues-card">
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon name="Target" className="w-5 h-5 text-blue-600"/>
-                          <h3 className="text-xs font-black uppercase text-blue-700">Progressive Overload</h3>
+                          <Icon name="Target" className="w-5 h-5 cues-accent"/>
+                          <h3 className="text-xs font-black uppercase cues-title">Progressive Overload</h3>
                         </div>
                         {overloadSuggestion ? (
                           <div className="space-y-1">
-                            <div className="text-sm font-black text-gray-900">Suggested next: {overloadSuggestion.nextWeight} lb × {overloadSuggestion.reps}</div>
-                            <div className="text-xs text-gray-600">Why: {overloadSuggestion.rationale}</div>
-                            <div className="text-[11px] text-blue-700 font-semibold">Suggestions stay optional—log what really happened.</div>
+                            <div className="text-sm font-black cues-title">Suggested next: {overloadSuggestion.nextWeight} lb × {overloadSuggestion.reps}</div>
+                            <div className="text-xs cues-muted">Why: {overloadSuggestion.rationale}</div>
+                            <div className="text-[11px] cues-muted font-semibold">Suggestions stay optional—log what really happened.</div>
                           </div>
                         ) : (
-                          <div className="text-sm text-gray-700">Complete 2 sessions to unlock a suggestion.</div>
+                          <div className="text-sm cues-muted">Complete 2 sessions to unlock a suggestion.</div>
                         )}
                       </div>
 
-                      <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                      <div className="cues-card">
                         <div className="flex items-center gap-2 mb-3">
-                          <Icon name="Check" className="w-5 h-5 text-green-600"/>
-                          <h3 className="text-xs font-black uppercase text-green-700">Form Cues</h3>
+                          <Icon name="Check" className="w-5 h-5 cues-accent"/>
+                          <h3 className="text-xs font-black uppercase cues-title">Form Cues</h3>
                         </div>
                         <ul className="space-y-2">
                           {eq.cues.map((cue, i) => (
-                            <li key={i} className="flex gap-2 text-sm text-gray-900">
-                              <span className="text-green-600 font-bold">•</span>
+                            <li key={i} className="flex gap-2 text-sm cues-title">
+                              <span className="cues-accent font-bold">•</span>
                               <span>{cue}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
 
-                      <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                      <div className="cues-card">
                         <div className="flex items-center gap-2 mb-3">
-                          <Icon name="Info" className="w-5 h-5 text-blue-600"/>
-                          <h3 className="text-xs font-black uppercase text-blue-700">Progression notes</h3>
+                          <Icon name="Info" className="w-5 h-5 cues-accent"/>
+                          <h3 className="text-xs font-black uppercase cues-title">Progression notes</h3>
                         </div>
-                        <p className="text-sm text-gray-900 leading-relaxed">{eq.progression}</p>
+                        <p className="text-sm cues-muted leading-relaxed">{eq.progression}</p>
                       </div>
                     </div>
                   </>
@@ -2862,6 +2977,8 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     // ========== PROFILE TAB ==========
     const ProfileView = ({ profile, setProfile, settings, setSettings, onReset, onResetOnboarding, onExportData, onImportData, streakObj, workoutCount = 0, restDayCount = 0, onViewAnalytics }) => {
       const [editing, setEditing] = useState(false);
+      const [appearanceOpen, setAppearanceOpen] = useState(false);
+      const [learnOpen, setLearnOpen] = useState(false);
       const [draft, setDraft] = useState(profile);
 
       useEffect(() => setDraft(profile), [profile]);
@@ -2884,6 +3001,21 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         { id: 'other', label: 'Other', detail: 'Hotel, park, travel', gymType: 'commercial' },
       ];
 
+      const learnItems = [
+        {
+          title: 'How Insights Work',
+          body: 'Insights are based only on your own history. No demographics, no comparisons—just you vs. you.'
+        },
+        {
+          title: 'Staying Consistent',
+          body: 'Log a little each session. Consistency beats intensity.'
+        },
+        {
+          title: 'Editing a Log',
+          body: 'Tap a set to edit it, or delete if it was an off day.'
+        }
+      ];
+
       return (
         <div className="flex flex-col h-full bg-gray-50">
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -2896,7 +3028,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               <ToggleRow
                 icon="TrendingUp"
                 title="Insights"
-                subtitle="Show last time + small suggestions"
+                subtitle="Optional, based only on your history"
                 enabled={settings.insightsEnabled !== false}
                 onToggle={(next) => setSettings({ ...settings, insightsEnabled: next })}
               />
@@ -2910,35 +3042,48 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
             </Card>
 
             <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">Appearance</div>
-              <ToggleRow
-                icon="Moon"
-                title="Dark Mode"
-                subtitle="Low-glare interface"
-                enabled={settings.darkMode}
-                onToggle={(next) => setSettings({ ...settings, darkMode: next })}
-              />
-              <div>
-                <div className="text-xs font-bold text-gray-500 uppercase mb-2">Dark mode accent</div>
-                <div className="flex gap-2">
-                  {accentOptions.map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setSettings({ ...settings, darkAccent: opt.id })}
-                      className={`flex-1 accent-pill ${settings.darkAccent === opt.id ? 'active' : ''} rounded-xl p-2 flex items-center gap-2`}
-                    >
-                      <span className="w-6 h-6 rounded-lg" style={{ background: opt.color }}></span>
-                      <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
-                    </button>
-                  ))}
+              <button
+                onClick={() => setAppearanceOpen(prev => !prev)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Appearance</div>
+                  <div className="text-sm text-gray-500">Theme and accent</div>
                 </div>
-                <div className="text-xs font-bold text-gray-500 uppercase mt-3">Theme preview</div>
-                <div className="theme-preview">
-                  <div className="preview-btn">Primary</div>
-                  <div className="preview-chip">Chip</div>
-                  <div className="preview-card">Card border</div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${appearanceOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {appearanceOpen && (
+                <div className="space-y-3 animate-expand">
+                  <ToggleRow
+                    icon="Moon"
+                    title="Dark Mode"
+                    subtitle="Low-glare interface"
+                    enabled={settings.darkMode}
+                    onToggle={(next) => setSettings({ ...settings, darkMode: next })}
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-gray-500 uppercase mb-2">Dark mode accent</div>
+                    <div className="flex gap-2">
+                      {accentOptions.map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setSettings({ ...settings, darkAccent: opt.id })}
+                          className={`flex-1 accent-pill ${settings.darkAccent === opt.id ? 'active' : ''} rounded-xl p-2 flex items-center gap-2`}
+                        >
+                          <span className="w-6 h-6 rounded-lg" style={{ background: opt.color }}></span>
+                          <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-xs font-bold text-gray-500 uppercase mt-3">Theme preview</div>
+                    <div className="theme-preview">
+                      <div className="preview-btn">Primary</div>
+                      <div className="preview-chip">Chip</div>
+                      <div className="preview-card">Card border</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
 
             <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 8%, transparent))' }}>
@@ -2975,6 +3120,29 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               >
                 Open Analytics
               </button>
+            </Card>
+
+            <Card className="space-y-3">
+              <button
+                onClick={() => setLearnOpen(prev => !prev)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Learn</div>
+                  <div className="text-sm text-gray-500">Quick hits</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${learnOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {learnOpen && (
+                <div className="space-y-2 animate-expand">
+                  {learnItems.map(item => (
+                    <details key={item.title} className="border border-gray-200 rounded-xl p-3 bg-white">
+                      <summary className="text-sm font-bold text-gray-900 cursor-pointer">{item.title}</summary>
+                      <p className="text-sm text-gray-600 mt-2">{item.body}</p>
+                    </details>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <Card className="space-y-3">
@@ -3133,7 +3301,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {insightsEnabled && lastSession?.duration && (
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-sm text-purple-800">
+            <div className="text-xs text-gray-500 font-semibold">
               Last time: {lastSession.duration} min
             </div>
           )}
@@ -3287,6 +3455,24 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [generatedWorkout, setGeneratedWorkout] = useState(null);
       const [dismissedGeneratedDate, setDismissedGeneratedDate] = useState(null);
       const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * motivationalQuotes.length));
+      const [generatorOptions, setGeneratorOptions] = useState({ goal: '', duration: '', equipment: '' });
+
+      const normalizeActiveSession = (session) => {
+        if (!session) return null;
+        if (session.items) return session;
+        const items = Object.values(session.exercises || {}).map(entry => ({
+          id: entry.id,
+          label: entry.label,
+          sets: entry.sets || 0,
+          kind: entry.kind || 'strength'
+        }));
+        return {
+          date: session.dateKey || session.date || toDayKey(new Date()),
+          status: session.status || (items.some(item => item.sets > 0) ? 'in_progress' : 'draft'),
+          items,
+          createdFrom: session.createdFrom || 'manual'
+        };
+      };
 
       useEffect(() => {
         const savedOnboarding = storage.get(ONBOARDING_KEY, false);
@@ -3298,6 +3484,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const savedState = storage.get('ps_v2_state', { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
         const savedDismiss = storage.get('ps_dismissed_generated_workout_date', null);
         const savedActiveSession = storage.get(ACTIVE_SESSION_KEY, null);
+        const normalizedActiveSession = normalizeActiveSession(savedActiveSession);
         const currentDayKey = toDayKey(new Date());
         
         const migratedProfile = {
@@ -3321,7 +3508,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setCardioHistory(savedCardio);
         setAppState(savedState);
         setDismissedGeneratedDate(savedDismiss);
-        setActiveSession(savedActiveSession?.dateKey === currentDayKey ? savedActiveSession : null);
+        setActiveSession(normalizedActiveSession?.date === currentDayKey ? normalizedActiveSession : null);
 
         const savedMeta = storage.get(STORAGE_KEY, null);
         const baseMeta = {
@@ -3460,6 +3647,28 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const achievements = useMemo(() => computeAchievements({ history, cardioHistory, strengthScoreObj, streakObj }), [history, cardioHistory, strengthScoreObj, streakObj]);
 
+      const lastWorkoutLabel = useMemo(() => {
+        const dates = [];
+        Object.values(history || {}).forEach(arr => {
+          (arr || []).forEach(s => {
+            if (s?.date) dates.push(new Date(s.date));
+          });
+        });
+        Object.values(cardioHistory || {}).forEach(arr => {
+          (arr || []).forEach(s => {
+            if (s?.date) dates.push(new Date(s.date));
+          });
+        });
+        if (dates.length === 0) return null;
+        const lastDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        const today = new Date();
+        const diffDays = Math.floor((today - lastDate) / 86400000);
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }, [history, cardioHistory]);
+
       const recordDayEntry = (dayKey, type = 'workout', extras = {}) => {
         setDayEntries(prev => {
           const existing = prev[dayKey];
@@ -3484,23 +3693,30 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const todayKey = toDayKey(new Date());
       const hasWorkoutToday = dayEntries?.[todayKey]?.type === 'workout';
       const restDayLogged = dayEntries?.[todayKey]?.type === 'rest';
-      const createEmptySession = () => ({
-        dateKey: todayKey,
-        createdAt: new Date().toISOString(),
-        exercises: {}
+      const activeSessionToday = activeSession?.date === todayKey ? activeSession : null;
+      const createEmptySession = (overrides = {}) => ({
+        date: todayKey,
+        status: 'draft',
+        items: [],
+        createdFrom: overrides.createdFrom || 'manual',
+        ...overrides
       });
 
       const updateActiveSession = (entry) => {
         setActiveSession(prev => {
-          const base = (!prev || prev.dateKey !== todayKey) ? createEmptySession() : prev;
-          const existing = base.exercises?.[entry.id];
-          const setsTotal = (existing?.sets || 0) + (entry.sets || 0);
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
+          const items = [...(base.items || [])];
+          const idx = items.findIndex(item => item.id === entry.id);
+          if (idx >= 0) {
+            const existing = items[idx];
+            items[idx] = { ...existing, ...entry, sets: (existing.sets || 0) + (entry.sets || 0) };
+          } else {
+            items.push({ ...entry });
+          }
           return {
             ...base,
-            exercises: {
-              ...(base.exercises || {}),
-              [entry.id]: { ...entry, sets: setsTotal }
-            }
+            status: (entry.sets || 0) > 0 ? 'in_progress' : base.status,
+            items
           };
         });
       };
@@ -3511,16 +3727,18 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const startActiveSession = () => {
-        setActiveSession(prev => (prev?.dateKey === todayKey ? prev : createEmptySession()));
+        setActiveSession(prev => (prev?.date === todayKey ? prev : createEmptySession({ createdFrom: 'manual' })));
       };
 
       const finishActiveSession = () => {
         if (!activeSession) return;
+        const hasData = (activeSession.items || []).some(item => item.sets > 0);
+        if (activeSession.status !== 'in_progress' && !hasData) return;
         const summary = {
           date: new Date().toISOString(),
           type: 'session',
           label: 'Workout Session',
-          exercises: Object.values(activeSession.exercises || {})
+          exercises: activeSession.items || []
         };
         setHistory(prev => ({
           ...prev,
@@ -3528,52 +3746,91 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }));
         recordDayEntry(todayKey, 'workout', { sessionSummary: summary });
         setActiveSession(null);
+        setGeneratedWorkout(null);
+        setDismissedGeneratedDate(null);
         setActiveEquipment(null);
         setActiveCardio(null);
         pushMessage('Workout saved.');
       };
 
-      const buildGeneratedWorkout = (type) => {
+      const buildGeneratedWorkout = (type, options = {}) => {
         const gymType = GYM_TYPES[profile.gymType];
         const planKey = type === 'legs' ? 'Legs' : type === 'push' ? 'Push' : type === 'pull' ? 'Pull' : type === 'full' ? 'Full Body' : todayWorkoutType;
         const plan = WORKOUT_PLANS[planKey] || {};
         const pool = [];
-        if (gymType?.machines) pool.push(...(plan.machines || []));
-        if (gymType?.dumbbells?.available) pool.push(...(plan.dumbbells || []));
-        if (gymType?.barbells?.available) pool.push(...(plan.barbells || []));
+        const wantsMachines = options.equipment === 'machines';
+        const wantsFree = options.equipment === 'free';
+        const allowMachines = gymType?.machines && !wantsFree;
+        const allowFree = (gymType?.dumbbells?.available || gymType?.barbells?.available) && !wantsMachines;
+        if (allowMachines) pool.push(...(plan.machines || []));
+        if (allowFree && gymType?.dumbbells?.available) pool.push(...(plan.dumbbells || []));
+        if (allowFree && gymType?.barbells?.available) pool.push(...(plan.barbells || []));
         const uniquePool = Array.from(new Set(pool));
         if (uniquePool.length === 0) {
           uniquePool.push(...Object.keys(EQUIPMENT_DB).slice(0, 12));
         }
-        while (uniquePool.length < 4) {
+        const targetCount = options.duration === 30 ? 3 : options.duration === 60 ? 5 : 4;
+        while (uniquePool.length < targetCount) {
           const fallback = Object.keys(EQUIPMENT_DB).filter(id => (EQUIPMENT_DB[id]?.tags || []).includes(planKey.toLowerCase()) || EQUIPMENT_DB[id]?.tags?.includes(planKey));
           if (fallback.length === 0) {
-            uniquePool.push(...Object.keys(EQUIPMENT_DB).filter(id => uniquePool.indexOf(id) === -1).slice(0, 4 - uniquePool.length));
+            uniquePool.push(...Object.keys(EQUIPMENT_DB).filter(id => uniquePool.indexOf(id) === -1).slice(0, targetCount - uniquePool.length));
           } else {
             uniquePool.push(...fallback);
           }
-          uniquePool.splice(4);
-          if (uniquePool.length >= 4 || fallback.length === 0) break;
+          uniquePool.splice(targetCount);
+          if (uniquePool.length >= targetCount || fallback.length === 0) break;
         }
         const picks = [];
         const poolCopy = [...uniquePool];
-        for (let i = 0; i < 4 && poolCopy.length > 0; i++) {
+        for (let i = 0; i < targetCount && poolCopy.length > 0; i++) {
           const idx = Math.floor(Math.random() * poolCopy.length);
           picks.push(poolCopy.splice(idx, 1)[0]);
         }
-        return { type, label: planKey === 'Full Body' ? 'Full Body' : `${planKey} Day`, exercises: picks };
+        const sanitizedOptions = {
+          goal: options.goal || '',
+          duration: options.duration || '',
+          equipment: options.equipment || ''
+        };
+        return { type, label: planKey === 'Full Body' ? 'Full Body' : `${planKey} Day`, exercises: picks, options: sanitizedOptions };
+      };
+
+      const attachGeneratedSession = (generated) => {
+        setActiveSession(prev => {
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
+          const items = generated.exercises.map(id => {
+            const existing = (base.items || []).find(item => item.id === id);
+            return {
+              id,
+              label: EQUIPMENT_DB[id]?.name || 'Exercise',
+              sets: existing?.sets || 0,
+              kind: 'strength'
+            };
+          });
+          return {
+            ...base,
+            date: todayKey,
+            status: base.status === 'in_progress' ? 'in_progress' : 'draft',
+            createdFrom: 'generated',
+            items
+          };
+        });
       };
 
       const triggerGenerator = (type) => {
-        const generated = buildGeneratedWorkout(type === 'surprise' ? ['legs','push','pull','full'][Math.floor(Math.random()*4)] : type);
+        const chosen = type === 'surprise' ? ['legs','push','pull','full'][Math.floor(Math.random()*4)] : type;
+        const generated = buildGeneratedWorkout(chosen, generatorOptions || {});
         setGeneratedWorkout(generated);
+        attachGeneratedSession(generated);
+        setDismissedGeneratedDate(null);
         setTab('workout');
       };
 
       const regenerateGeneratedWorkout = () => {
         if (!generatedWorkout) return;
-        const regenerated = buildGeneratedWorkout(generatedWorkout.type);
+        const hasOptions = generatorOptions?.goal || generatorOptions?.duration || generatorOptions?.equipment;
+        const regenerated = buildGeneratedWorkout(generatedWorkout.type, hasOptions ? generatorOptions : (generatedWorkout.options || {}));
         setGeneratedWorkout(regenerated);
+        attachGeneratedSession(regenerated);
       };
 
       const swapGeneratedExercise = (index, newId) => {
@@ -3583,11 +3840,38 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           updated[index] = newId;
           return { ...prev, exercises: updated };
         });
+        setActiveSession(prev => {
+          if (!prev || prev.date !== todayKey || prev.createdFrom !== 'generated') return prev;
+          const items = [...(prev.items || [])];
+          if (items.length <= index) return prev;
+          const target = items[index];
+          const updatedItem = {
+            id: newId,
+            label: EQUIPMENT_DB[newId]?.name || 'Exercise',
+            sets: target?.sets || 0,
+            kind: 'strength'
+          };
+          items[index] = updatedItem;
+          return { ...prev, items };
+        });
       };
 
       const startGeneratedWorkout = () => {
         if (!generatedWorkout) return;
         ensureWorkoutDayEntry(generatedWorkout.exercises);
+        setActiveSession(prev => {
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
+          const items = generatedWorkout.exercises.map(id => {
+            const existing = (base.items || []).find(item => item.id === id);
+            return {
+              id,
+              label: EQUIPMENT_DB[id]?.name || 'Exercise',
+              sets: existing?.sets || 0,
+              kind: 'strength'
+            };
+          });
+          return { ...base, status: 'in_progress', createdFrom: 'generated', items };
+        });
         setActiveEquipment(generatedWorkout.exercises[0]);
       };
 
@@ -3603,6 +3887,19 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const handleStartWorkout = () => {
         ensureWorkoutDayEntry();
         setTab('workout');
+      };
+
+      const handleSelectEquipment = (id) => {
+        if (!id) return;
+        setActiveSession(prev => {
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
+          const items = [...(base.items || [])];
+          if (!items.find(item => item.id === id)) {
+            items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
+          }
+          return { ...base, items };
+        });
+        setActiveEquipment(id);
       };
 
       const handleSaveSession = (id, session) => {
@@ -3892,13 +4189,17 @@ return (
                       onGenerate={triggerGenerator}
                       quoteIndex={quoteIndex}
                       onRefreshQuote={() => setQuoteIndex((prev) => (prev + 1) % motivationalQuotes.length)}
+                      lastWorkoutLabel={lastWorkoutLabel}
+                      activeSession={activeSessionToday}
+                      generatorOptions={generatorOptions}
+                      setGeneratorOptions={setGeneratorOptions}
                     />
                   )}
                   {tab === 'workout' && (
                     <Workout
                       profile={profile}
                       history={history}
-                      onEquipmentSelect={setActiveEquipment}
+                      onEquipmentSelect={handleSelectEquipment}
                       onOpenCardio={(type) => setActiveCardio(type)}
                       settings={settings}
                       setSettings={setSettings}
@@ -3915,10 +4216,12 @@ return (
                       hasWorkoutToday={hasWorkoutToday}
                       dismissedGeneratedDate={dismissedGeneratedDate}
                       setDismissedGeneratedDate={setDismissedGeneratedDate}
-                      activeSession={activeSession}
+                      activeSession={activeSessionToday}
                       onStartSession={startActiveSession}
                       onFinishSession={finishActiveSession}
                       activeEquipment={activeEquipment}
+                      generatorOptions={generatorOptions}
+                      setGeneratorOptions={setGeneratorOptions}
                     />
                   )}
                   {tab === 'profile' && (
