@@ -110,6 +110,164 @@ body.dark-mode .shadow-2xl {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 
+body.app-shell {
+  min-height: 100vh;
+}
+
+.home-screen {
+  overflow: hidden;
+}
+
+.home-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.home-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.home-card-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-mini-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.home-primary-button {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 12px 28px var(--accent-soft);
+  transition: transform 0.2s ease;
+}
+
+.home-primary-button:active {
+  transform: scale(0.98);
+}
+
+.home-secondary-button {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.home-quick-generate {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.quick-chip {
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.quote-block {
+  padding-top: 6px;
+}
+
+.quote-block.subtle {
+  opacity: 0.7;
+}
+
+.quote-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.quote-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.rest-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.06);
+}
+
+.post-workout-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 17, 23, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.post-workout-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 22px;
+  border-radius: 20px;
+  max-width: 320px;
+  text-align: left;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.12);
+}
+
+.exercise-history-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exercise-history-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.exercise-history-card.expanded {
+  grid-column: span 3;
+}
+
+.exercise-history-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.exercise-history-detail {
+  margin-top: 8px;
+}
+
 .bg-purple-600 {
   background: var(--accent) !important;
   color: #fff !important;
