@@ -180,6 +180,45 @@ select:focus-visible {
   box-shadow: 0 12px 36px var(--accent-soft);
 }
 
+.ios-install-tip {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translate(-50%, 8px);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+  animation: toastIn 0.2s ease-out forwards;
+  z-index: 1200;
+}
+
+@keyframes toastIn {
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 .accent-pill {
   border: 1px solid var(--border);
   background: var(--surface);
