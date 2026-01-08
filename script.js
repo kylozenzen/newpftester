@@ -10,8 +10,19 @@ const { useState, useEffect, useMemo, useRef } = React;
     const manifestLink = document.getElementById('manifest-placeholder');
     if (manifestLink) manifestLink.setAttribute('href', 'manifest.json');
     const iconLink = document.getElementById('app-icon');
-    if (iconLink) iconLink.setAttribute('href', 'icons/icon-192.svg');
     const appleTouchLink = document.getElementById('apple-touch-icon');
+    const APP_ICON_SVG = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="120" fill="#0b1020"/>
+        <rect x="96" y="224" width="320" height="64" rx="32" fill="none" stroke="rgba(139, 92, 246, 0.55)" stroke-width="14"/>
+        <rect x="80" y="206" width="40" height="100" rx="16" fill="#f5f3ff" opacity="0.9"/>
+        <rect x="392" y="206" width="40" height="100" rx="16" fill="#f5f3ff" opacity="0.9"/>
+        <line x1="156" y1="256" x2="356" y2="256" stroke="#f5f3ff" stroke-width="10" stroke-linecap="round"/>
+        <text x="256" y="338" text-anchor="middle" font-size="96" font-weight="700" fill="#f5f3ff" font-family="Inter, system-ui, sans-serif">PS</text>
+      </svg>
+    `.trim();
+    const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(APP_ICON_SVG)}`;
+    if (iconLink) iconLink.setAttribute('href', svgDataUri);
     const ensureAppleTouchIcon = () => {
       if (!appleTouchLink) return;
       const size = 180;
@@ -20,19 +31,14 @@ const { useState, useEffect, useMemo, useRef } = React;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.fillStyle = '#0b1020';
-      ctx.fillRect(0, 0, size, size);
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.55)';
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 18, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#f5f3ff';
-      ctx.font = '700 64px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('PS', size / 2, size / 2 + 4);
-      appleTouchLink.setAttribute('href', canvas.toDataURL('image/png'));
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        appleTouchLink.setAttribute('href', canvas.toDataURL('image/png'));
+      };
+      const encoded = btoa(unescape(encodeURIComponent(APP_ICON_SVG)));
+      img.src = `data:image/svg+xml;base64,${encoded}`;
     };
     ensureAppleTouchIcon();
 
@@ -58,14 +64,27 @@ const { useState, useEffect, useMemo, useRef } = React;
     const InstallPrompt = () => {
       const [show, setShow] = useState(false);
       const [prompt, setPrompt] = useState(null);
+      const [showIosTip, setShowIosTip] = useState(false);
 
       useEffect(() => {
+        const ua = navigator.userAgent || '';
+        const isAndroid = /android/i.test(ua);
+        const isIOS = /iphone|ipad|ipod/i.test(ua);
+        const isSafari = /safari/i.test(ua) && !/crios|fxios|opios|edgios|chrome/i.test(ua);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
         const handler = (e) => {
+          if (!isAndroid) return;
           e.preventDefault();
           setPrompt(e);
           setShow(true);
         };
         window.addEventListener('beforeinstallprompt', handler);
+
+        if (isIOS && isSafari && !isStandalone) {
+          setShowIosTip(true);
+        }
+
         return () => window.removeEventListener('beforeinstallprompt', handler);
       }, []);
 
@@ -76,22 +95,32 @@ const { useState, useEffect, useMemo, useRef } = React;
         setShow(false);
       };
 
-      if (!show) return null;
+      if (!show && !showIosTip) return null;
 
       return ReactDOM.createPortal(
-        <div className="install-prompt">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl">📱</div>
-            <div className="flex-1">
-              <div className="font-bold text-sm">Install App</div>
-              <div className="text-xs opacity-80">Add to home screen</div>
+        <>
+          {show && (
+            <div className="install-prompt">
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">📱</div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm">Install on Android</div>
+                  <div className="text-xs opacity-80">Add to home screen</div>
+                </div>
+                <button onClick={install} className="bg-white/20 px-4 py-2 rounded-lg font-bold text-sm">
+                  Install
+                </button>
+                <button onClick={() => setShow(false)} className="text-white/60 text-xl px-2">×</button>
+              </div>
             </div>
-            <button onClick={install} className="bg-white/20 px-4 py-2 rounded-lg font-bold text-sm">
-              Install
-            </button>
-            <button onClick={() => setShow(false)} className="text-white/60 text-xl px-2">×</button>
-          </div>
-        </div>,
+          )}
+          {showIosTip && (
+            <div className="ios-install-tip">
+              <div className="text-xs font-semibold text-gray-600">Tip: Add Planet Strength to your Home Screen from Share.</div>
+              <button onClick={() => setShowIosTip(false)} className="text-gray-400 text-lg px-2">×</button>
+            </div>
+          )}
+        </>,
         document.getElementById('install-prompt')
       );
     };
@@ -1034,6 +1063,15 @@ const motivationalQuotes = [
       );
     };
 
+    const Toast = ({ message }) => {
+      if (!message) return null;
+      return (
+        <div className="toast" role="status" aria-live="polite">
+          {message}
+        </div>
+      );
+    };
+
     const TabBar = ({ currentTab, setTab }) => (
       <div className="fixed bottom-0 left-0 right-0 tabbar z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex justify-around items-center h-16 px-2">
@@ -1506,7 +1544,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
   const isSessionMode = activeSession?.status === 'in_progress';
   const hasSession = !!activeSession;
   const isPlanMode = !isSessionMode;
-  const canHideDraft = draftPlan && !sessionHasLogged && activeSession?.status !== 'in_progress';
+  const canHideDraft = draftPlan && !sessionHasLogged && (!activeSession || activeSession.status === 'draft');
   const shouldHideDraft = draftHidden && canHideDraft;
   const builderExercises = draftPlan?.exercises || [];
   const isGeneratedPlan = draftPlan?.createdFrom === 'generated';
@@ -1937,7 +1975,9 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                       {isGeneratedPlan && <span className="generated-badge">Generated</span>}
                     </div>
                     <div className="text-lg font-black workout-heading">Today’s workout</div>
-                    <div className="text-[11px] workout-muted">Build it now. Start when ready.</div>
+                    <div className="text-[11px] workout-muted">
+                      {isGeneratedPlan ? 'Generated once. Use Today’s Session to log.' : 'Build it now. Start when ready.'}
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     {draftPlan && (
@@ -1966,6 +2006,22 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                     )}
                   </div>
                 </div>
+                {isGeneratedPlan ? (
+                  <div className="space-y-3">
+                    <div className="text-xs workout-muted">
+                      {sessionExerciseCount} exercises ready. Tap an exercise in Today’s Session to log sets.
+                    </div>
+                    <button
+                      onClick={() => setDraftOptionsOpen(prev => !prev)}
+                      className="text-xs font-bold text-purple-700 text-left"
+                    >
+                      {draftOptionsOpen ? 'Hide generator options' : 'Edit generator options'}
+                    </button>
+                    {draftOptionsOpen && (
+                      <GeneratorOptions options={generatorOptions} onUpdate={setGeneratorOptions} compact />
+                    )}
+                  </div>
+                ) : (
                 <div className={`space-y-3 ${draftCollapsed ? 'hidden' : ''}`}>
                   {builderExercises.length === 0 && (
                     <div className="text-xs workout-muted">Add exercises below or generate a plan.</div>
@@ -2011,20 +2067,8 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                       </div>
                     );
                   })}
-                  {isGeneratedPlan && (
-                    <>
-                      <button
-                        onClick={() => setDraftOptionsOpen(prev => !prev)}
-                        className="text-xs font-bold text-purple-700 text-left"
-                      >
-                        {draftOptionsOpen ? 'Hide generator options' : 'Edit generator options'}
-                      </button>
-                      {draftOptionsOpen && (
-                        <GeneratorOptions options={generatorOptions} onUpdate={setGeneratorOptions} compact />
-                      )}
-                    </>
-                  )}
                 </div>
+                )}
               <button
                 onClick={() => {
                   onStartWorkoutFromBuilder?.();
@@ -2387,7 +2431,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         });
         setSetInputs({ weight: '', reps: '' });
         requestAnimationFrame(() => {
-          (repsInputRef.current || weightInputRef.current)?.focus();
+          (weightInputRef.current || repsInputRef.current)?.focus();
         });
         setTimeout(() => setIsAddingSet(false), 300);
         setEditingIndex(null);
@@ -2677,9 +2721,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                                 className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
                               />
                             </div>
-                            {lastSessionSummary && (
-                              <div className="text-[11px] text-gray-500 font-semibold">Last time: {lastSessionSummary}</div>
-                            )}
 
                             <button
                               onClick={handleQuickAddSet}
@@ -3720,11 +3761,6 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {insightsEnabled && lastSession?.duration && (
-            <div className="text-xs text-gray-500 font-semibold">
-              Last time: {lastSession.duration} min
-            </div>
-          )}
           <div className="bg-white border border-gray-200 rounded-2xl p-4">
             <div className="text-xs font-bold text-gray-500 uppercase mb-2">Cardio Type</div>
             <div className="grid grid-cols-2 gap-2">
@@ -3860,6 +3896,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [activeSession, setActiveSession] = useState(null);
       const [inlineMessage, setInlineMessage] = useState(null);
       const messageTimerRef = useRef(null);
+      const [toastMessage, setToastMessage] = useState(null);
+      const toastTimerRef = useRef(null);
       const [focusSession, setFocusSession] = useState(false);
       const [sessionStartNotice, setSessionStartNotice] = useState(null);
       const sessionStartTimerRef = useRef(null);
@@ -4079,6 +4117,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       }, []);
 
       useEffect(() => {
+        return () => {
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        };
+      }, []);
+
+      useEffect(() => {
         if (!sessionStartNotice) return;
         if (sessionStartTimerRef.current) clearTimeout(sessionStartTimerRef.current);
         sessionStartTimerRef.current = setTimeout(() => setSessionStartNotice(null), 4000);
@@ -4092,6 +4136,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setInlineMessage(text);
         if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
         messageTimerRef.current = setTimeout(() => setInlineMessage(null), 3200);
+      };
+
+      const showToast = (text) => {
+        if (!text) return;
+        setToastMessage(text);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToastMessage(null), 1500);
       };
 
       useEffect(() => {
@@ -4205,6 +4256,28 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         createdFrom: overrides.createdFrom || 'manual',
         ...overrides
       });
+
+      const updateSessionItemsByIds = (ids = [], options = {}) => {
+        const uniqueIds = Array.from(new Set(ids));
+        setActiveSession(prev => {
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: options.createdFrom || 'manual' }) : prev;
+          const items = buildSessionItemsFromIds(uniqueIds, base.items || []);
+          const setsByExercise = { ...(base.setsByExercise || {}) };
+          uniqueIds.forEach(id => {
+            if (!setsByExercise[id]) setsByExercise[id] = [];
+          });
+          Object.keys(setsByExercise).forEach(key => {
+            if (!uniqueIds.includes(key)) delete setsByExercise[key];
+          });
+          return {
+            ...base,
+            status: options.status || base.status,
+            createdFrom: options.createdFrom || base.createdFrom || 'manual',
+            items,
+            setsByExercise
+          };
+        });
+      };
 
       const buildSessionItem = (exerciseId, kind = 'strength') => {
         const name = EQUIPMENT_DB[exerciseId]?.name || 'Exercise';
@@ -4400,16 +4473,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const draft = buildDraftPlan(chosen, generatorOptions || {});
         createDraft({ ...draft, createdFrom: 'generated' });
         if (activeSessionToday?.status !== 'in_progress') {
-          setActiveSession(prev => {
-            const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
-            const items = buildSessionItemsFromIds(draft.exercises || [], base.items || []);
-            const setsByExercise = { ...(base.setsByExercise || {}) };
-            items.forEach(item => {
-              const key = item.exerciseId || item.id;
-              if (!setsByExercise[key]) setsByExercise[key] = [];
-            });
-            return { ...base, status: 'draft', createdFrom: 'generated', items, setsByExercise };
-          });
+          updateSessionItemsByIds(draft.exercises || [], { status: 'draft', createdFrom: 'generated' });
         }
         setTab('workout');
         setFocusDraft(true);
@@ -4420,6 +4484,10 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const hasOptions = generatorOptions?.goal || generatorOptions?.duration || generatorOptions?.equipment;
         const regenerated = buildDraftPlan(draftPlan.type, hasOptions ? generatorOptions : (draftPlan.options || {}));
         createDraft({ ...regenerated, createdFrom: 'generated' });
+        updateSessionItemsByIds(regenerated.exercises || [], {
+          status: activeSessionToday?.status === 'in_progress' ? 'in_progress' : 'draft',
+          createdFrom: 'generated'
+        });
         setFocusDraft(true);
       };
 
@@ -4481,6 +4549,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const clearDraftPlan = () => {
         setDraftPlan(null);
         setDismissedDraftDate(null);
+        if (activeSessionToday) {
+          updateSessionItemsByIds([], {
+            status: activeSessionToday?.status === 'in_progress' ? 'in_progress' : 'draft',
+            createdFrom: 'manual'
+          });
+        }
       };
 
       const startWorkoutFromBuilder = () => {
@@ -4577,6 +4651,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         if (!id) return;
         addExerciseToSession(id, { status: activeSessionToday?.status === 'in_progress' ? 'in_progress' : 'draft' });
         updateDraftPlanExercises(prev => Array.from(new Set([...prev, id])));
+        showToast('Added to today’s session');
       };
 
       const handleSelectExercise = (id, mode, options = {}) => {
@@ -4903,6 +4978,7 @@ return (
           <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <InlineMessage message={inlineMessage} />
+              <Toast message={toastMessage} />
               {showAnalytics ? (
                 <div className="h-full flex flex-col bg-gray-50">
                   <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
