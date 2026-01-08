@@ -73,7 +73,7 @@ body.dark-mode {
 }
 
 .text-gray-400 {
-  color: color-mix(in srgb, var(--muted) 70%, #c7ccd6) !important;
+  color: color-mix(in srgb, var(--muted) 55%, var(--text)) !important;
 }
 
 .border-gray-100,
@@ -544,7 +544,7 @@ select:focus-visible {
 }
 
 .cues-card {
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-left: 3px solid color-mix(in srgb, var(--accent) 70%, transparent);
   border-radius: 16px;
@@ -738,6 +738,30 @@ body.dark-mode .finish-footer .finish-summary {
 
 .session-entry-row:active {
   transform: scale(0.98);
+}
+
+.tile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tile-action {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.tile-action.primary {
+  border-color: var(--accent-soft);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .session-action-button {
