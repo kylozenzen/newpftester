@@ -215,6 +215,47 @@ select:focus-visible {
   z-index: 1200;
 }
 
+.baseline-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.baseline-primary {
+  color: var(--text);
+}
+
+.baseline-accent {
+  color: var(--accent);
+}
+
+.baseline-input {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text);
+}
+
+.baseline-input::placeholder {
+  color: var(--muted);
+}
+
+.baseline-button {
+  border: none;
+}
+
+.baseline-button--active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 10px 24px var(--accent-soft);
+}
+
+.baseline-button--disabled {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  color: var(--text);
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
 @keyframes toastIn {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
