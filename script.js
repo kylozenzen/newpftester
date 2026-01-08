@@ -1,11 +1,40 @@
 const { useState, useEffect, useMemo, useRef } = React;
 
+    const FEEDBACK_EMAIL = 'hello@planetstrength.app';
+    const FOLLOW_URL = 'https://example.com/planet-strength';
+    const DONATE_URL = 'https://example.com/support-planet-strength';
+    const APP_VERSION = '1.0.0';
+
     // ========== PWA SETUP ==========
     // Confirm manifest + icon links (guarded for templates that omit them).
     const manifestLink = document.getElementById('manifest-placeholder');
     if (manifestLink) manifestLink.setAttribute('href', 'manifest.json');
     const iconLink = document.getElementById('app-icon');
     if (iconLink) iconLink.setAttribute('href', 'icons/icon-192.svg');
+    const appleTouchLink = document.getElementById('apple-touch-icon');
+    const ensureAppleTouchIcon = () => {
+      if (!appleTouchLink) return;
+      const size = 180;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#0b1020';
+      ctx.fillRect(0, 0, size, size);
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.55)';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2 - 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#f5f3ff';
+      ctx.font = '700 64px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PS', size / 2, size / 2 + 4);
+      appleTouchLink.setAttribute('href', canvas.toDataURL('image/png'));
+    };
+    ensureAppleTouchIcon();
 
     // Register service worker
     // Register service worker only on supported origins (not file://)
@@ -131,11 +160,6 @@ const { useState, useEffect, useMemo, useRef } = React;
         } 
       }
     };
-
-    const FEEDBACK_EMAIL = 'hello@planetstrength.app';
-    const FOLLOW_URL = 'https://example.com/planet-strength';
-    const DONATE_URL = 'https://example.com/support-planet-strength';
-    const APP_VERSION = '1.0.0';
 
     // ========== CONSTANTS ==========
     const AVATARS = ["🦁","🦍","🦖","💪","🏃","🧘","🤖","👽","🦊","⚡"];
@@ -1345,7 +1369,7 @@ const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
   );
 };
 
-const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, lastWorkoutLabel, activeSession }) => {
+const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, lastWorkoutLabel, activeSession, weekWorkoutCount }) => {
   const quote = motivationalQuotes[quoteIndex % motivationalQuotes.length];
   const homeMessages = [
     'Keep it simple today.',
@@ -1355,8 +1379,10 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, last
   ];
   const subMessage = homeMessages[quoteIndex % homeMessages.length];
   const isResuming = activeSession?.status === 'in_progress';
-  const loggedCount = (activeSession?.items || []).filter(item => item.sets > 0).length;
   const lastWorkoutText = lastWorkoutLabel ? lastWorkoutLabel : 'First workout? Log one today.';
+  const sessionExercises = activeSession?.items || [];
+  const sessionSetCount = Object.values(activeSession?.setsByExercise || {}).reduce((sum, sets) => sum + (sets?.length || 0), 0);
+  const sessionExerciseCount = sessionExercises.length;
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -1377,20 +1403,20 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, last
 
         <div className="grid grid-cols-2 gap-3">
           <Card className="flex items-center gap-3">
-            <div className="text-2xl">🔥</div>
-            <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase">Streak</div>
-              <div className="text-xl font-black text-orange-600">{streakObj.current} days</div>
-              <div className="text-[11px] text-gray-500">Best: {streakObj.best}</div>
-            </div>
-          </Card>
-
-          <Card className="flex items-center gap-3">
             <div className="text-2xl">🗓️</div>
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase">Last workout</div>
               <div className="text-sm font-black text-gray-900">{lastWorkoutText}</div>
               <div className="text-[11px] text-gray-500">{lastWorkoutLabel ? 'You vs. you.' : 'Log one today.'}</div>
+            </div>
+          </Card>
+
+          <Card className="flex items-center gap-3">
+            <div className="text-2xl">📅</div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase">This week</div>
+              <div className="text-sm font-black text-gray-900">Workouts this week: {weekWorkoutCount}</div>
+              <div className="text-[11px] text-gray-500">Steady progress, your pace.</div>
             </div>
           </Card>
         </div>
@@ -1404,7 +1430,7 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, last
           </button>
           {isResuming && (
             <div className="text-xs text-gray-500 font-semibold text-center">
-              {loggedCount > 0 ? `${loggedCount} exercises logged so far` : 'Workout in progress'}
+              {sessionExerciseCount} exercises • {sessionSetCount} sets
             </div>
           )}
         </div>
@@ -1452,7 +1478,7 @@ const Home = ({ profile, streakObj, onStartWorkout, onGenerate, quoteIndex, last
   );
 };
 
-const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused, onRemoveSessionExercise, onSwapSessionExercise, sessionStartNotice }) => {
+const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused, onRemoveSessionExercise, onSwapSessionExercise, sessionStartNotice, onStartEmptySession }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapState, setSwapState] = useState(null);
@@ -1491,19 +1517,21 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
     if (!activeSession || activeSession.date !== todayKey) return [];
     return activeSession.items || [];
   }, [activeSession, todayKey]);
-  const sessionHasLogged = sessionEntries.some(entry => entry.sets > 0);
+  const sessionSetsByExercise = activeSession?.date === todayKey ? (activeSession?.setsByExercise || {}) : {};
+  const sessionHasLogged = sessionEntries.some(entry => (sessionSetsByExercise[entry.exerciseId || entry.id] || []).length > 0);
   const canFinish = activeSession && (activeSession.status === 'in_progress' || sessionHasLogged);
   const isSessionMode = activeSession?.status === 'in_progress';
   const hasSession = !!activeSession;
   const isPlanMode = !isSessionMode;
-  const canHideDraft = draftPlan && !sessionHasLogged;
+  const canHideDraft = draftPlan && !sessionHasLogged && activeSession?.status !== 'in_progress';
   const shouldHideDraft = draftHidden && canHideDraft;
   const builderExercises = draftPlan?.exercises || [];
   const isGeneratedPlan = draftPlan?.createdFrom === 'generated';
   const sessionExerciseCount = sessionEntries.length;
-  const sessionSetCount = sessionEntries.reduce((sum, entry) => sum + (entry.sets || 0), 0);
+  const sessionSetCount = sessionEntries.reduce((sum, entry) => sum + ((sessionSetsByExercise[entry.exerciseId || entry.id] || []).length), 0);
   const welcomeMessages = ['Welcome back.', 'Ready when you are.', 'Let’s build today’s workout.'];
   const welcomeMessage = useMemo(() => welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)], []);
+  const showStartHere = !searchQuery && (!hasSession || sessionEntries.length === 0);
 
   const filterOptions = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Pinned'];
 
@@ -1633,14 +1661,13 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
     setHoldingFinish(false);
   };
 
-  const renderExerciseRow = (id, actionLabel = 'Log', onAction) => {
+  const renderExerciseRow = (id, actionLabel = 'Add', onAction) => {
     const eq = EQUIPMENT_DB[id];
     if (!eq) return null;
     return (
-      <button
+      <div
         key={id}
-        onClick={() => (onAction ? onAction(id) : onSelectExercise(id, isSessionMode ? 'session' : 'plan'))}
-        className="w-full p-3 rounded-xl border border-gray-200 bg-white flex items-center justify-between active:scale-[0.98] transition"
+        className="w-full p-3 rounded-xl border border-gray-200 bg-white flex items-center justify-between"
       >
         <div className="flex items-center gap-3 text-left">
           <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center text-lg">
@@ -1658,42 +1685,51 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           >
             {pinnedExercises.includes(id) ? 'Pinned' : 'Pin'}
           </button>
-          <div className="text-purple-600 font-semibold text-sm">{actionLabel}</div>
+          <button
+            onClick={(e) => { e.stopPropagation(); (onAction ? onAction(id) : onAddExerciseFromSearch?.(id)); }}
+            className="text-purple-600 font-semibold text-sm"
+          >
+            {actionLabel}
+          </button>
         </div>
-      </button>
+      </div>
     );
   };
 
-  const renderExerciseTile = (id, source = 'default') => {
+  const renderExerciseTile = (id) => {
     const eq = EQUIPMENT_DB[id];
     if (!eq) return null;
     const pinned = pinnedExercises.includes(id);
     const typeIcon = eq.type === 'machine' ? '⚙️' : eq.type === 'dumbbell' ? '🏋️' : '🏋️‍♂️';
     return (
-      <button
-        key={id}
-        onClick={() => onSelectExercise(id, source === 'library' ? 'library' : (isSessionMode ? 'session' : 'plan'))}
-        className="tile text-left active:scale-[0.98] transition"
-      >
+      <div key={id} className="tile text-left">
         <div className="flex items-center justify-between mb-1">
           <div className="text-lg">{typeIcon}</div>
+          <span className="text-[11px] workout-muted">{eq.target}</span>
+        </div>
+        <div className="font-bold workout-heading text-sm leading-tight">{eq.name}</div>
+        <div className="tile-actions">
           <button
-            onClick={(e) => { e.stopPropagation(); togglePin(id); }}
-            className={`px-2 py-1 rounded-full text-[11px] font-bold ${pinned ? 'workout-chip' : 'bg-gray-100 text-gray-500'}`}
+            onClick={() => togglePin(id)}
+            className={`tile-action ${pinned ? 'workout-chip' : ''}`}
           >
             {pinned ? 'Pinned' : 'Pin'}
           </button>
+          <button
+            onClick={() => onAddExerciseFromSearch?.(id)}
+            className="tile-action primary"
+          >
+            Add
+          </button>
         </div>
-        <div className="font-bold workout-heading text-sm leading-tight">{eq.name}</div>
-        <div className="text-[11px] workout-muted">{eq.target}</div>
-      </button>
+      </div>
     );
   };
 
   const swapOptions = useMemo(() => {
     if (!swapState) return [];
     const isDraftSwap = swapState.mode === 'draft';
-    const sourceList = isDraftSwap ? (draftPlan?.exercises || []) : sessionEntries.map(entry => entry.id);
+    const sourceList = isDraftSwap ? (draftPlan?.exercises || []) : sessionEntries.map(entry => entry.exerciseId || entry.id);
     const currentId = sourceList[swapState.index];
     if (!currentId) return [];
     const current = EQUIPMENT_DB[currentId];
@@ -1726,7 +1762,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
 
   const handleSearchAdd = (id) => {
     if (!id) return;
-    const alreadyAdded = sessionEntries.some(entry => entry.id === id);
+    const alreadyAdded = sessionEntries.some(entry => (entry.exerciseId || entry.id) === id);
     if (alreadyAdded) {
       onPushMessage?.('Already added');
       setSearchQuery('');
@@ -1781,6 +1817,32 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
       </div>
 
       <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4 workout-scroll">
+        {showStartHere && (
+          <Card className="space-y-3 workout-card mt-4">
+            <div>
+              <div className="text-xs font-bold workout-muted uppercase">Start here</div>
+              <div className="text-base font-black workout-heading">Build today’s session</div>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setLibraryVisible(true);
+                  setActiveFilter('All');
+                }}
+                className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98]"
+              >
+                Browse exercises
+              </button>
+              <button
+                onClick={() => onStartEmptySession?.()}
+                className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+              >
+                Start today’s session
+              </button>
+            </div>
+            <div className="text-[11px] workout-muted">Add exercises first. Tap them in Today’s Session to log sets.</div>
+          </Card>
+        )}
         {isPlanMode && !searchQuery && (
           <div className="text-sm text-gray-500 font-semibold">{welcomeMessage}</div>
         )}
@@ -1830,21 +1892,24 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               <div className="text-xs workout-muted">Session ready. Add exercises as you go.</div>
             ) : (
               <div className="space-y-2">
-                {sessionEntries.map((entry, idx) => (
+                {sessionEntries.map((entry, idx) => {
+                  const entryId = entry.exerciseId || entry.id;
+                  const entrySetCount = (sessionSetsByExercise[entryId] || []).length;
+                  return (
                   <div
-                    key={entry.id}
-                    onClick={() => onSelectExercise(entry.id, 'session')}
+                    key={entryId}
+                    onClick={() => onSelectExercise(entryId, 'session')}
                     className="session-entry-row"
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') onSelectExercise(entry.id, 'session'); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onSelectExercise(entryId, 'session'); }}
                   >
                     <div>
-                      <div className="text-sm font-bold workout-heading">{entry.label}</div>
+                      <div className="text-sm font-bold workout-heading">{entry.name || entry.label}</div>
                       <div className="text-[11px] workout-muted">{entry.kind === 'cardio' ? 'Cardio' : 'Strength'}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-xs font-bold text-purple-600">{entry.sets} {entry.kind === 'cardio' ? 'entries' : 'sets'}</div>
+                      <div className="text-xs font-bold text-purple-600">{entrySetCount} {entry.kind === 'cardio' ? 'entries' : 'sets'}</div>
                       {activeSession?.createdFrom === 'generated' && entry.kind !== 'cardio' && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setSwapState({ mode: 'session', index: idx }); }}
@@ -1854,15 +1919,15 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                         </button>
                       )}
                       <button
-                        onClick={(e) => { e.stopPropagation(); onRemoveSessionExercise?.(entry.id); }}
+                        onClick={(e) => { e.stopPropagation(); onRemoveSessionExercise?.(entryId); }}
                         className="session-remove-button"
-                        aria-label={`Remove ${entry.label}`}
+                        aria-label={`Remove ${entry.name || entry.label}`}
                       >
                         <Icon name="Trash" className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             )}
             <button
@@ -1882,7 +1947,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                 <button onClick={() => onHideDraft(null)} className="text-purple-700 font-bold text-sm">Show</button>
               </Card>
             ) : (
-              <Card className="space-y-3 workout-card" ref={draftCardRef}>
+              <Card className="space-y-4 workout-card" ref={draftCardRef}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -1892,6 +1957,20 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                     <div className="text-[11px] workout-muted">Build it now. Start when ready.</div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
+                    {draftPlan && (
+                      <button
+                        onClick={() => {
+                          if (canHideDraft) {
+                            onHideDraft(todayKey);
+                          } else {
+                            setDraftCollapsed(prev => !prev);
+                          }
+                        }}
+                        className="text-xs font-bold text-gray-500"
+                      >
+                        {canHideDraft ? 'Hide for today' : (draftCollapsed ? 'Expand plan' : 'Collapse plan')}
+                      </button>
+                    )}
                     {builderExercises.length > 0 && (
                       <button onClick={() => onClearDraft?.()} className="text-xs font-bold text-gray-500">
                         Clear workout
@@ -1980,7 +2059,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
         <Card className="space-y-2 workout-card">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold workout-muted uppercase">Pinned Exercises</div>
-            <div className="text-xs workout-muted">{isSessionMode ? 'Tap to log' : 'Tap to add'}</div>
+            <div className="text-xs workout-muted">Tap to add</div>
           </div>
           {filteredPinned.length === 0 ? (
             <div className="text-xs workout-muted">Pin your go-tos for quick access.</div>
@@ -1998,7 +2077,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               <div className="text-xs workout-muted">Last used</div>
             </div>
             <div className="space-y-2">
-              {filteredRecents.map(id => renderExerciseRow(id, isSessionMode ? 'Log' : 'Add'))}
+              {filteredRecents.map(id => renderExerciseRow(id, 'Add'))}
             </div>
           </Card>
         )}
@@ -2021,7 +2100,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               ))}
             </div>
             <div className="exercise-grid">
-              {filteredPool.map(id => renderExerciseTile(id, 'library'))}
+              {filteredPool.map(id => renderExerciseTile(id))}
             </div>
           </Card>
         )}
@@ -2202,7 +2281,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     };
 
     // ========== EQUIPMENT DETAIL ==========
-    const EquipmentDetail = ({ id, profile, history, settings, onSave, onClose }) => {
+    const EquipmentDetail = ({ id, profile, history, settings, onSave, onClose, onUpdateSessionSets }) => {
       const eq = EQUIPMENT_DB[id];
       const sessions = history || [];
       const insightsEnabled = settings?.insightsEnabled !== false;
@@ -2214,6 +2293,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const [anchorAdjusted, setAnchorAdjusted] = useState(false);
       const [showAdjust, setShowAdjust] = useState(false);
       const [loggedSets, setLoggedSets] = useState([]);
+      const [setInputs, setSetInputs] = useState({ weight: '', reps: '' });
       const [editingIndex, setEditingIndex] = useState(null);
       const [editValues, setEditValues] = useState({ weight: '', reps: '' });
       const [baselineInputs, setBaselineInputs] = useState({ weight: '', reps: '' });
@@ -2223,6 +2303,8 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const savedRef = useRef(false);
       const latestDraftRef = useRef({ loggedSets: [], anchorWeight: '', anchorReps: '', anchorAdjusted: false, note: '' });
       const lastSetSubmitRef = useRef({ key: '', at: 0 });
+      const weightInputRef = useRef(null);
+      const repsInputRef = useRef(null);
 
       const best = useMemo(() => getBestForEquipment(sessions), [sessions]);
       const nextTarget = useMemo(() => getNextTarget(profile, id, best), [profile, id, best]);
@@ -2261,6 +2343,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       }, [sessions]);
 
       const lastSession = sessions[sessions.length - 1];
+      const lastSessionSummary = useMemo(() => {
+        if (!insightsEnabled || !lastSession || !lastSession.sets?.length) return null;
+        const lastSet = lastSession.sets[lastSession.sets.length - 1];
+        if (!lastSet?.weight || !lastSet?.reps) return null;
+        return `${lastSet.weight} lb × ${lastSet.reps} reps`;
+      }, [insightsEnabled, lastSession]);
       const defaultAnchor = useMemo(() => {
         const anchor = deriveSessionAnchor(lastSession);
         if (anchor.weight && anchor.reps) return anchor;
@@ -2277,6 +2365,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         setShowAdjust(false);
         setLoggedSets([]);
         setNote('');
+        setSetInputs({ weight: '', reps: '' });
         setBaselineInputs({
           weight: baselineFromHistory?.weight ? String(baselineFromHistory.weight) : '',
           reps: baselineFromHistory?.reps ? String(baselineFromHistory.reps) : ''
@@ -2285,9 +2374,22 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         savedRef.current = false;
       }, [id, defaultAnchor, baselineFromHistory, sessions.length]);
 
+      useEffect(() => {
+        setSetInputs(prev => ({
+          weight: prev.weight || (anchorWeight || ''),
+          reps: prev.reps || (anchorReps || '')
+        }));
+      }, [anchorWeight, anchorReps]);
+
+      const syncSessionSets = (nextSets) => {
+        if (onUpdateSessionSets) {
+          onUpdateSessionSets(id, nextSets);
+        }
+      };
+
       const handleQuickAddSet = () => {
-        const w = Number(anchorWeight);
-        const r = Number(anchorReps);
+        const w = Number(setInputs.weight);
+        const r = Number(setInputs.reps);
         if (!w || !r || w <= 0 || r <= 0) return;
         if (isAddingSet) return;
         const now = Date.now();
@@ -2295,7 +2397,15 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         if (lastSetSubmitRef.current.key === key && now - lastSetSubmitRef.current.at < 900) return;
         lastSetSubmitRef.current = { key, at: now };
         setIsAddingSet(true);
-        setLoggedSets(prev => [...prev, { weight: w, reps: r }]);
+        setLoggedSets(prev => {
+          const next = [...prev, { weight: w, reps: r }];
+          syncSessionSets(next);
+          return next;
+        });
+        setSetInputs({ weight: '', reps: '' });
+        requestAnimationFrame(() => {
+          (repsInputRef.current || weightInputRef.current)?.focus();
+        });
         setTimeout(() => setIsAddingSet(false), 300);
         setEditingIndex(null);
       };
@@ -2311,12 +2421,20 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         const w = Number(editValues.weight);
         const r = Number(editValues.reps);
         if (!w || !r || w <= 0 || r <= 0 || editingIndex === null) return;
-        setLoggedSets(prev => prev.map((set, idx) => idx === editingIndex ? { weight: w, reps: r } : set));
+        setLoggedSets(prev => {
+          const next = prev.map((set, idx) => idx === editingIndex ? { weight: w, reps: r } : set);
+          syncSessionSets(next);
+          return next;
+        });
         setEditingIndex(null);
       };
 
       const deleteSet = (idx) => {
-        setLoggedSets(prev => prev.filter((_, i) => i !== idx));
+        setLoggedSets(prev => {
+          const next = prev.filter((_, i) => i !== idx);
+          syncSessionSets(next);
+          return next;
+        });
         setEditingIndex(null);
       };
 
@@ -2556,11 +2674,35 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                               )}
                             </div>
 
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                value={setInputs.weight}
+                                onChange={(e) => setSetInputs(prev => ({ ...prev, weight: e.target.value }))}
+                                placeholder="Weight"
+                                ref={weightInputRef}
+                                className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                              />
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                value={setInputs.reps}
+                                onChange={(e) => setSetInputs(prev => ({ ...prev, reps: e.target.value }))}
+                                placeholder="Reps"
+                                ref={repsInputRef}
+                                className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                              />
+                            </div>
+                            {lastSessionSummary && (
+                              <div className="text-[11px] text-gray-500 font-semibold">Last time: {lastSessionSummary}</div>
+                            )}
+
                             <button
                               onClick={handleQuickAddSet}
-                              disabled={!anchorWeight || !anchorReps || isBaselineMode || isAddingSet}
+                              disabled={!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet}
                               className={`w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                                (!anchorWeight || !anchorReps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
+                                (!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
                               }`}
                             >
                               <span className="text-lg">＋</span>
@@ -2745,7 +2887,9 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     // ========== PROGRESS TAB ==========
     const Progress = ({ profile, history, strengthScoreObj, cardioHistory }) => {
       const [selectedEquipment, setSelectedEquipment] = useState(null);
-      const [showHistory, setShowHistory] = useState(false);
+      const [analyticsTab, setAnalyticsTab] = useState('overview');
+      const [exerciseHistoryQuery, setExerciseHistoryQuery] = useState('');
+      const [exerciseHistorySelected, setExerciseHistorySelected] = useState(null);
 
       const allEquipment = Object.keys(EQUIPMENT_DB);
       const combinedSessions = useMemo(() => {
@@ -2827,37 +2971,48 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="p-4">
               <h1 className="text-2xl font-black text-gray-900">Analytics</h1>
-              <div className="text-xs text-gray-400 font-bold">Your strength journey</div>
+              <div className="text-xs text-gray-500 font-bold">Your strength journey</div>
             </div>
             
             <div className="flex gap-2 px-4 pb-3">
               <button
                 onClick={() => {
                   setSelectedEquipment(null);
-                  setShowHistory(false);
+                  setAnalyticsTab('overview');
                 }}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                  !selectedEquipment && !showHistory ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
+                  analyticsTab === 'overview' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
                 }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => {
-                  setShowHistory(!showHistory);
                   setSelectedEquipment(null);
+                  setAnalyticsTab('history');
                 }}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                  showHistory ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
+                  analyticsTab === 'history' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
                 }`}
               >
                 History
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedEquipment(null);
+                  setAnalyticsTab('exercise');
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  analyticsTab === 'exercise' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Exercise History
               </button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-3">
-            {showHistory ? (
+            {analyticsTab === 'history' ? (
               <>
                 <Card>
                   <div className="flex items-center justify-between mb-3">
@@ -2926,6 +3081,88 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                     );
                   })()}
                 </Card>
+              </>
+            ) : analyticsTab === 'exercise' ? (
+              <>
+                <Card className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-gray-500 uppercase">Exercise History</div>
+                      <div className="text-sm text-gray-500">Explore your logged sets.</div>
+                    </div>
+                    <Icon name="Search" className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <input
+                    value={exerciseHistoryQuery}
+                    onChange={(e) => setExerciseHistoryQuery(e.target.value)}
+                    placeholder="Search exercises"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold"
+                  />
+                  {(() => {
+                    const withHistory = allEquipment.filter(id => (history[id] || []).length > 0);
+                    const filtered = withHistory.filter(id => (EQUIPMENT_DB[id]?.name || '').toLowerCase().includes(exerciseHistoryQuery.toLowerCase()));
+                    if (filtered.length === 0) {
+                      return <div className="text-sm text-gray-500 text-center py-4">No exercises match yet.</div>;
+                    }
+                    return (
+                      <div className="exercise-grid">
+                        {filtered.map(id => {
+                          const eq = EQUIPMENT_DB[id];
+                          const sessions = history[id] || [];
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => setExerciseHistorySelected(id)}
+                              className="tile text-left"
+                            >
+                              <div className="text-xs font-bold text-gray-900">{eq.name}</div>
+                              <div className="text-[10px] text-gray-500">{sessions.length} sessions</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </Card>
+                {exerciseHistorySelected && (() => {
+                  const eq = EQUIPMENT_DB[exerciseHistorySelected];
+                  const sessions = (history[exerciseHistorySelected] || []).slice(-6).reverse();
+                  return (
+                    <Card className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-gray-500 uppercase">History Detail</div>
+                          <div className="text-base font-black text-gray-900">{eq?.name}</div>
+                        </div>
+                        <button
+                          onClick={() => setExerciseHistorySelected(null)}
+                          className="text-xs font-bold text-gray-500"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      {sessions.length === 0 ? (
+                        <div className="text-sm text-gray-500">No sessions logged yet.</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {sessions.map((session, idx) => {
+                            const summary = (session.sets || []).map(set => `${set.reps}×${set.weight}`).join(', ');
+                            return (
+                              <div key={idx} className="p-3 rounded-xl border border-gray-200 bg-white">
+                                <div className="text-xs font-bold text-gray-900">
+                                  {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </div>
+                                <div className="text-[11px] text-gray-500">{(session.sets || []).length} sets</div>
+                                <div className="text-sm text-gray-700">{summary || 'No sets logged.'}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-gray-500">Videos coming later.</div>
+                    </Card>
+                  );
+                })()}
               </>
             ) : !selectedEquipment ? (
               <>
@@ -3034,7 +3271,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                       const sessionCount = sessions.length;
                       const bar = Math.min(100, Math.max(10, sessionCount * 12));
                       return (
-                        <div key={id} onClick={() => { setSelectedEquipment(id); setShowHistory(false); }} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:border-purple-200 transition-all">
+                        <div key={id} onClick={() => { setSelectedEquipment(id); setAnalyticsTab('overview'); }} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-100 cursor-pointer hover:border-purple-200 transition-all">
                           <div className="flex items-center gap-2">
                             <div className="text-lg">{eq.type === 'machine' ? '⚙️' : eq.type === 'dumbbell' ? '🏋️' : '🏋️‍♂️'}</div>
                             <div>
@@ -3056,7 +3293,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               </>
             ) : (
               <Card>
-                <button onClick={() => setSelectedEquipment(null)} className="flex items-center gap-2 mb-4 text-purple-600 font-semibold text-sm">
+                <button onClick={() => { setSelectedEquipment(null); setAnalyticsTab('overview'); }} className="flex items-center gap-2 mb-4 text-purple-600 font-semibold text-sm">
                   <Icon name="ChevronLeft" className="w-4 h-4" />
                   Back to Overview
                 </button>
@@ -3091,8 +3328,14 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     // ========== PROFILE TAB ==========
     const ProfileView = ({ profile, setProfile, settings, setSettings, onReset, onResetOnboarding, onExportData, onImportData, streakObj, workoutCount = 0, restDayCount = 0, onViewAnalytics }) => {
       const [editing, setEditing] = useState(false);
+      const [workoutOpen, setWorkoutOpen] = useState(true);
       const [appearanceOpen, setAppearanceOpen] = useState(false);
+      const [analyticsOpen, setAnalyticsOpen] = useState(true);
       const [learnOpen, setLearnOpen] = useState(false);
+      const [aboutOpen, setAboutOpen] = useState(true);
+      const [musicOpen, setMusicOpen] = useState(false);
+      const [profileOpen, setProfileOpen] = useState(false);
+      const [dataOpen, setDataOpen] = useState(false);
       const [draft, setDraft] = useState(profile);
 
       useEffect(() => setDraft(profile), [profile]);
@@ -3138,21 +3381,31 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
 
           <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
             <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">Workout</div>
-              <ToggleRow
-                icon="TrendingUp"
-                title="Insights"
-                subtitle="Optional, based only on your history"
-                enabled={settings.insightsEnabled !== false}
-                onToggle={(next) => setSettings({ ...settings, insightsEnabled: next })}
-              />
-              <ToggleRow
-                icon="List"
-                title="Show All Exercises"
-                subtitle="Start with the full library open"
-                enabled={settings.showAllExercises}
-                onToggle={(next) => setSettings({ ...settings, showAllExercises: next })}
-              />
+              <button onClick={() => setWorkoutOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Workout</div>
+                  <div className="text-sm text-gray-500">Logging preferences</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${workoutOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {workoutOpen && (
+                <div className="space-y-3 animate-expand">
+                  <ToggleRow
+                    icon="TrendingUp"
+                    title="Insights"
+                    subtitle="Optional, based only on your history"
+                    enabled={settings.insightsEnabled !== false}
+                    onToggle={(next) => setSettings({ ...settings, insightsEnabled: next })}
+                  />
+                  <ToggleRow
+                    icon="List"
+                    title="Show All Exercises"
+                    subtitle="Start with the full library open"
+                    enabled={settings.showAllExercises}
+                    onToggle={(next) => setSettings({ ...settings, showAllExercises: next })}
+                  />
+                </div>
+              )}
             </Card>
 
             <Card className="space-y-3">
@@ -3200,40 +3453,24 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               )}
             </Card>
 
-            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), color-mix(in srgb, var(--accent) 8%, transparent))' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
-                  <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
-                  <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
-                </div>
-                <div className="ml-auto text-right">
-                  <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
-                  <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
-                  <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
-                <div className="bg-white rounded-xl p-2 border border-gray-100">
-                  <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
-                  <div>Workouts logged</div>
-                </div>
-                <div className="bg-white rounded-xl p-2 border border-gray-100">
-                  <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
-                  <div>Rest days</div>
-                </div>
-              </div>
-            </Card>
-
             <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">Analytics</div>
-              <button
-                onClick={onViewAnalytics}
-                className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98] transition"
-              >
-                Open Analytics
+              <button onClick={() => setAnalyticsOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Analytics</div>
+                  <div className="text-sm text-gray-500">Progress view</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
               </button>
+              {analyticsOpen && (
+                <div className="space-y-3 animate-expand">
+                  <button
+                    onClick={onViewAnalytics}
+                    className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold active:scale-[0.98] transition"
+                  >
+                    Open Analytics
+                  </button>
+                </div>
+              )}
             </Card>
 
             <Card className="space-y-3">
@@ -3260,110 +3497,189 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
             </Card>
 
             <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">About Planet Strength</div>
-              <div className="text-sm text-gray-600">A calm, no-noise workout tracker focused on simple logging and steady progress.</div>
-              <div className="text-xs text-gray-500">Version {APP_VERSION}</div>
-              <div className="grid grid-cols-1 gap-2">
-                <a href={`mailto:${FEEDBACK_EMAIL}`} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                  Send feedback
-                </a>
-                <a href={FOLLOW_URL} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                  Follow updates
-                </a>
-                <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                  Support the app
-                </a>
-              </div>
+              <button onClick={() => setAboutOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">About Planet Strength</div>
+                  <div className="text-sm text-gray-500">What this app is for</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${aboutOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {aboutOpen && (
+                <div className="space-y-3 animate-expand">
+                  <div className="text-sm text-gray-600">A calm, no-noise workout tracker focused on simple logging and steady progress.</div>
+                  <div className="text-xs text-gray-500">Version {APP_VERSION}</div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <a href={`mailto:${FEEDBACK_EMAIL}`} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                      Send feedback
+                    </a>
+                    <a href={FOLLOW_URL} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                      Follow updates
+                    </a>
+                    <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                      Support the app
+                    </a>
+                  </div>
+                </div>
+              )}
             </Card>
 
             <Card className="space-y-3">
-              <div className="flex items-center justify-between">
+              <button onClick={() => setMusicOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Music shortcuts</div>
+                  <div className="text-sm text-gray-500">Open your player</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${musicOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {musicOpen && (
+                <div className="space-y-2 animate-expand">
+                  <a href="https://music.apple.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                    Apple Music
+                  </a>
+                  <a href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                    Spotify
+                  </a>
+                  <a href="https://music.youtube.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
+                    YouTube Music
+                  </a>
+                </div>
+              )}
+            </Card>
+
+            <Card className="space-y-3">
+              <button onClick={() => setProfileOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
                 <div>
                   <div className="text-xs font-bold text-gray-500 uppercase">Profile</div>
-                  <div className="text-sm text-gray-500">Edit name, emoji, location, and onboarding</div>
+                  <div className="text-sm text-gray-500">Edit name, emoji, location</div>
                 </div>
-                <button onClick={() => setEditing(!editing)} className="text-purple-600 font-bold text-sm">{editing ? 'Close' : 'Edit'}</button>
-              </div>
-              {editing && (
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {profileOpen && (
                 <div className="space-y-3 animate-expand">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Name</label>
-                    <input
-                      value={draft.username}
-                      onChange={(e) => setDraft({ ...draft, username: e.target.value })}
-                      className="w-full p-3 border border-gray-200 rounded-xl font-semibold"
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Emoji avatar</label>
-                    <div className="grid grid-cols-5 gap-2">
-                      {AVATARS.map(emoji => (
-                        <button
-                          key={emoji}
-                          onClick={() => setDraft({ ...draft, avatar: emoji })}
-                          className={`p-2 rounded-xl text-2xl ${draft.avatar === emoji ? 'bg-purple-50 border-2 border-purple-400' : 'bg-white border border-gray-200'}`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
+                  <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
+                      <div>
+                        <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
+                        <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
+                        <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
+                        <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
+                        <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
+                      <div className="bg-white rounded-xl p-2 border border-gray-100">
+                        <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
+                        <div>Workouts logged</div>
+                      </div>
+                      <div className="bg-white rounded-xl p-2 border border-gray-100">
+                        <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
+                        <div>Rest days</div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Where are you working out?</label>
-                    <div className="space-y-2">
-                      {locations.map(loc => (
-                        <button
-                          key={loc.id}
-                          onClick={() => setDraft({ ...draft, workoutLocation: loc.id, gymType: loc.gymType })}
-                          className={`w-full p-3 rounded-xl border-2 text-left ${draft.workoutLocation === loc.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'}`}
-                        >
-                          <div className="font-bold text-sm text-gray-900">{loc.label}</div>
-                          <div className="text-xs text-gray-500">{loc.detail}</div>
-                        </button>
-                      ))}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-gray-500 uppercase">Edit profile</div>
+                      <div className="text-sm text-gray-500">Name, emoji, location, onboarding</div>
                     </div>
+                    <button onClick={() => setEditing(!editing)} className="text-purple-600 font-bold text-sm">{editing ? 'Close' : 'Edit'}</button>
                   </div>
+                  {editing && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Name</label>
+                        <input
+                          value={draft.username}
+                          onChange={(e) => setDraft({ ...draft, username: e.target.value })}
+                          className="w-full p-3 border border-gray-200 rounded-xl font-semibold"
+                          placeholder="Your name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Emoji avatar</label>
+                        <div className="grid grid-cols-5 gap-2">
+                          {AVATARS.map(emoji => (
+                            <button
+                              key={emoji}
+                              onClick={() => setDraft({ ...draft, avatar: emoji })}
+                              className={`p-2 rounded-xl text-2xl ${draft.avatar === emoji ? 'bg-purple-50 border-2 border-purple-400' : 'bg-white border border-gray-200'}`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Where are you working out?</label>
+                        <div className="space-y-2">
+                          {locations.map(loc => (
+                            <button
+                              key={loc.id}
+                              onClick={() => setDraft({ ...draft, workoutLocation: loc.id, gymType: loc.gymType })}
+                              className={`w-full p-3 rounded-xl border-2 text-left ${draft.workoutLocation === loc.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'}`}
+                            >
+                              <div className="font-bold text-sm text-gray-900">{loc.label}</div>
+                              <div className="text-xs text-gray-500">{loc.detail}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={saveProfile}
+                        disabled={!draft.username || !draft.avatar || !draft.workoutLocation}
+                        className={`w-full py-3 rounded-xl font-bold text-white ${draft.username && draft.avatar && draft.workoutLocation ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                      >
+                        Save Profile
+                      </button>
+                    </div>
+                  )}
                   <button
-                    onClick={saveProfile}
-                    disabled={!draft.username || !draft.avatar || !draft.workoutLocation}
-                    className={`w-full py-3 rounded-xl font-bold text-white ${draft.username && draft.avatar && draft.workoutLocation ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                    onClick={onResetOnboarding}
+                    className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold flex items-center justify-between"
                   >
-                    Save Profile
+                    <span>Reset onboarding</span>
+                    <Icon name="RefreshCw" className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
               )}
-              <button
-                onClick={onResetOnboarding}
-                className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold flex items-center justify-between"
-              >
-                <span>Reset onboarding</span>
-                <Icon name="RefreshCw" className="w-4 h-4 text-gray-500" />
-              </button>
             </Card>
 
             <Card className="space-y-3">
-              <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={onExportData}
-                  className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
-                >
-                  Export
-                </button>
-                <button
-                  onClick={onImportData}
-                  className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
-                >
-                  Import
-                </button>
-              </div>
-              <button
-                onClick={onReset}
-                className="w-full p-3 rounded-xl border border-red-200 text-red-700 font-bold bg-red-50"
-              >
-                Clear all data
+              <button onClick={() => setDataOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
+                  <div className="text-sm text-gray-500">Backup and reset</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${dataOpen ? 'rotate-180' : ''}`} />
               </button>
+              {dataOpen && (
+                <div className="space-y-3 animate-expand">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={onExportData}
+                      className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
+                    >
+                      Export
+                    </button>
+                    <button
+                      onClick={onImportData}
+                      className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
+                    >
+                      Import
+                    </button>
+                  </div>
+                  <button
+                    onClick={onReset}
+                    className="w-full p-3 rounded-xl border border-red-200 text-red-700 font-bold bg-red-50"
+                  >
+                    Clear all data
+                  </button>
+                </div>
+              )}
             </Card>
           </div>
         </div>
@@ -3584,17 +3900,36 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const normalizeActiveSession = (session) => {
         if (!session) return null;
-        if (session.items) return session;
-        const items = Object.values(session.exercises || {}).map(entry => ({
-          id: entry.id,
-          label: entry.label,
+        const date = session.dateKey || session.date || toDayKey(new Date());
+        const setsByExercise = session.setsByExercise || {};
+        const rawItems = session.items || Object.values(session.exercises || {}).map(entry => ({
+          exerciseId: entry.id,
+          name: entry.label,
           sets: entry.sets || 0,
           kind: entry.kind || 'strength'
         }));
+        const items = rawItems.map(item => {
+          const exerciseId = item.exerciseId || item.id;
+          const name = item.name || item.label || EQUIPMENT_DB[exerciseId]?.name || 'Exercise';
+          const fallbackSets = item.sets || 0;
+          if (!setsByExercise[exerciseId]) {
+            setsByExercise[exerciseId] = Array.from({ length: fallbackSets }, () => ({ reps: null, weight: null }));
+          }
+          const resolvedSets = setsByExercise[exerciseId] || [];
+          return {
+            exerciseId,
+            name,
+            kind: item.kind || 'strength',
+            sets: resolvedSets.length,
+            id: exerciseId,
+            label: name
+          };
+        });
         return {
-          date: session.dateKey || session.date || toDayKey(new Date()),
+          date,
           status: session.status || (items.some(item => item.sets > 0) ? 'in_progress' : 'draft'),
           items,
+          setsByExercise,
           createdFrom: session.createdFrom || 'manual'
         };
       };
@@ -3705,7 +4040,16 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       useEffect(() => { if(loaded) storage.set('ps_v2_cardio', cardioHistory); }, [cardioHistory, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_state', appState); }, [appState, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_dismissed_draft_date', dismissedDraftDate); }, [dismissedDraftDate, loaded]);
-      useEffect(() => { if(loaded) storage.set(ACTIVE_SESSION_KEY, activeSession); }, [activeSession, loaded]);
+      useEffect(() => {
+        if (!loaded) return;
+        const persist = () => storage.set(ACTIVE_SESSION_KEY, activeSession);
+        if (typeof requestIdleCallback === 'function') {
+          const idleId = requestIdleCallback(persist);
+          return () => cancelIdleCallback(idleId);
+        }
+        const timeoutId = setTimeout(persist, 0);
+        return () => clearTimeout(timeoutId);
+      }, [activeSession, loaded]);
       useEffect(() => { if(loaded) storage.set(DRAFT_SESSION_KEY, draftPlan); }, [draftPlan, loaded]);
       useEffect(() => {
         if (!loaded) return;
@@ -3832,6 +4176,18 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         return lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }, [history, cardioHistory]);
 
+      const weekWorkoutCount = useMemo(() => {
+        const today = new Date();
+        let count = 0;
+        for (let i = 0; i < 7; i++) {
+          const day = new Date(today);
+          day.setDate(today.getDate() - i);
+          const key = toDayKey(day);
+          if (dayEntries?.[key]?.type === 'workout') count += 1;
+        }
+        return count;
+      }, [dayEntries]);
+
       const recordDayEntry = (dayKey, type = 'workout', extras = {}) => {
         setDayEntries(prev => {
           const existing = prev[dayKey];
@@ -3862,19 +4218,31 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         date: todayKey,
         status: 'draft',
         items: [],
+        setsByExercise: {},
         createdFrom: overrides.createdFrom || 'manual',
         ...overrides
       });
 
+      const buildSessionItem = (exerciseId, kind = 'strength') => {
+        const name = EQUIPMENT_DB[exerciseId]?.name || 'Exercise';
+        return {
+          exerciseId,
+          name,
+          kind,
+          sets: 0,
+          id: exerciseId,
+          label: name
+        };
+      };
+
       const buildSessionItemsFromIds = (ids = [], baseItems = []) => {
         return ids.map(id => {
-          const existing = baseItems.find(item => item.id === id);
-          return existing ? { ...existing, label: EQUIPMENT_DB[id]?.name || existing.label || 'Exercise', kind: existing.kind || 'strength' } : {
-            id,
-            label: EQUIPMENT_DB[id]?.name || 'Exercise',
-            sets: 0,
-            kind: 'strength'
-          };
+          const existing = baseItems.find(item => item.exerciseId === id || item.id === id);
+          if (existing) {
+            const name = EQUIPMENT_DB[id]?.name || existing.name || existing.label || 'Exercise';
+            return { ...existing, exerciseId: id, id, name, label: name, kind: existing.kind || 'strength' };
+          }
+          return buildSessionItem(id);
         });
       };
 
@@ -3886,24 +4254,45 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         });
       };
 
-      const updateActiveSession = (entry) => {
+      const updateActiveSession = (entry, setsList = null) => {
+        if (!entry?.id) return;
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
           const items = [...(base.items || [])];
-          const idx = items.findIndex(item => item.id === entry.id);
-          if (idx >= 0) {
-            const existing = items[idx];
-            const resolvedSets = entry.sets !== undefined ? entry.sets : (existing.sets || 0);
-            items[idx] = { ...existing, ...entry, sets: resolvedSets };
-          } else {
-            items.push({ ...entry });
-          }
+          const setsByExercise = { ...(base.setsByExercise || {}) };
+          const idx = items.findIndex(item => (item.exerciseId || item.id) === entry.id);
+          const resolvedSets = Array.isArray(setsList)
+            ? setsList
+            : (Array.isArray(setsByExercise[entry.id]) ? setsByExercise[entry.id] : Array.from({ length: entry.sets || 0 }, () => ({ reps: null, weight: null })));
+          setsByExercise[entry.id] = resolvedSets;
+          const name = entry.name || entry.label || EQUIPMENT_DB[entry.id]?.name || 'Exercise';
+          const updatedItem = {
+            ...(idx >= 0 ? items[idx] : buildSessionItem(entry.id, entry.kind || 'strength')),
+            exerciseId: entry.id,
+            id: entry.id,
+            name,
+            label: name,
+            kind: entry.kind || (idx >= 0 ? items[idx].kind : 'strength'),
+            sets: resolvedSets.length
+          };
+          if (idx >= 0) items[idx] = updatedItem;
+          else items.push(updatedItem);
           return {
             ...base,
-            status: (entry.sets || 0) > 0 ? 'in_progress' : base.status,
-            items
+            status: resolvedSets.length > 0 ? 'in_progress' : base.status,
+            items,
+            setsByExercise
           };
         });
+      };
+
+      const updateSessionSets = (exerciseId, sets) => {
+        if (!exerciseId) return;
+        updateActiveSession({
+          id: exerciseId,
+          name: EQUIPMENT_DB[exerciseId]?.name || 'Exercise',
+          kind: 'strength'
+        }, sets);
       };
 
       const ensureWorkoutDayEntry = (exercises = []) => {
@@ -3943,7 +4332,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const finishActiveSession = () => {
         if (!activeSession) return;
-        const hasData = (activeSession.items || []).some(item => item.sets > 0);
+        const hasData = Object.values(activeSession.setsByExercise || {}).some(sets => (sets || []).length > 0);
         if (activeSession.status !== 'in_progress' && !hasData) return;
         const summary = {
           date: new Date().toISOString(),
@@ -4028,7 +4417,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           setActiveSession(prev => {
             const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'generated' }) : prev;
             const items = buildSessionItemsFromIds(draft.exercises || [], base.items || []);
-            return { ...base, status: 'draft', createdFrom: 'generated', items };
+            const setsByExercise = { ...(base.setsByExercise || {}) };
+            items.forEach(item => {
+              const key = item.exerciseId || item.id;
+              if (!setsByExercise[key]) setsByExercise[key] = [];
+            });
+            return { ...base, status: 'draft', createdFrom: 'generated', items, setsByExercise };
           });
         }
         setTab('workout');
@@ -4045,9 +4439,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const swapDraftExercise = (index, newId) => {
         const currentId = draftPlanToday?.exercises?.[index];
-        const existingEntry = activeSessionToday?.items?.find(item => item.id === currentId);
+        const existingEntry = activeSessionToday?.items?.find(item => (item.exerciseId || item.id) === currentId);
         if (existingEntry?.sets > 0) {
-          const confirmed = window.confirm('Swap this exercise? Logged sets for it will be removed from today’s session.');
+          const confirmed = window.confirm('This will remove logged sets for this exercise from today’s session.');
           if (!confirmed) return;
           removeExerciseLogsForToday(currentId, existingEntry.kind);
         }
@@ -4060,23 +4454,26 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveSession(prev => {
           if (!prev || prev.date !== todayKey) return prev;
           const items = [...(prev.items || [])];
+          const setsByExercise = { ...(prev.setsByExercise || {}) };
           if (items[index]) {
-            items[index] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
+            items[index] = buildSessionItem(newId);
           } else if (currentId) {
             const idx = items.findIndex(item => item.id === currentId);
             if (idx >= 0) {
-              items[idx] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
+              items[idx] = buildSessionItem(newId);
             }
           }
-          return { ...prev, items };
+          if (currentId) delete setsByExercise[currentId];
+          if (!setsByExercise[newId]) setsByExercise[newId] = [];
+          return { ...prev, items, setsByExercise };
         });
       };
 
       const removeDraftExercise = (index) => {
         const currentId = draftPlanToday?.exercises?.[index];
-        const existingEntry = activeSessionToday?.items?.find(item => item.id === currentId);
+        const existingEntry = activeSessionToday?.items?.find(item => (item.exerciseId || item.id) === currentId);
         if (existingEntry?.sets > 0) {
-          const confirmed = window.confirm('Remove this exercise from today’s session? Logged sets will be removed from this session.');
+          const confirmed = window.confirm('This will remove logged sets for this exercise from today’s session.');
           if (!confirmed) return;
           removeExerciseLogsForToday(currentId, existingEntry.kind);
         }
@@ -4088,7 +4485,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         if (currentId) {
           setActiveSession(prev => {
             if (!prev || prev.date !== todayKey) return prev;
-            return { ...prev, items: (prev.items || []).filter(item => item.id !== currentId) };
+            const setsByExercise = { ...(prev.setsByExercise || {}) };
+            delete setsByExercise[currentId];
+            return { ...prev, items: (prev.items || []).filter(item => (item.exerciseId || item.id) !== currentId), setsByExercise };
           });
         }
       };
@@ -4104,9 +4503,14 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: plan.createdFrom || 'manual' }) : prev;
           const baseItems = base.items || [];
-          const combinedIds = Array.from(new Set([...(baseItems.map(item => item.id)), ...(plan.exercises || [])]));
+          const combinedIds = Array.from(new Set([...(baseItems.map(item => item.exerciseId || item.id)), ...(plan.exercises || [])]));
           const items = buildSessionItemsFromIds(combinedIds, baseItems);
-          return { ...base, status: 'in_progress', createdFrom: plan.createdFrom || base.createdFrom || 'manual', items };
+          const setsByExercise = { ...(base.setsByExercise || {}) };
+          items.forEach(item => {
+            const key = item.exerciseId || item.id;
+            if (!setsByExercise[key]) setsByExercise[key] = [];
+          });
+          return { ...base, status: 'in_progress', createdFrom: plan.createdFrom || base.createdFrom || 'manual', items, setsByExercise };
         });
         setDraftPlan(null);
         setDismissedDraftDate(null);
@@ -4135,6 +4539,14 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }
       };
 
+      const startEmptySession = () => {
+        setActiveSession(prev => {
+          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
+          return { ...base, status: 'draft' };
+        });
+        setFocusSession(true);
+      };
+
       const addExerciseToDraft = (id) => {
         if (!id) return;
         createDraft({
@@ -4148,10 +4560,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveSession(prev => {
           if (!prev || prev.date !== todayKey || prev.status === 'in_progress') return prev;
           const items = [...(prev.items || [])];
-          if (!items.find(item => item.id === id)) {
-            items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
+          const setsByExercise = { ...(prev.setsByExercise || {}) };
+          if (!items.find(item => (item.exerciseId || item.id) === id)) {
+            items.push(buildSessionItem(id));
+            setsByExercise[id] = [];
           }
-          return { ...prev, items };
+          return { ...prev, items, setsByExercise };
         });
       };
 
@@ -4160,11 +4574,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: options.createdFrom || 'manual' }) : prev;
           const items = [...(base.items || [])];
-          if (!items.find(item => item.id === id)) {
-            items.push({ id, label: EQUIPMENT_DB[id]?.name || 'Exercise', sets: 0, kind: 'strength' });
+          const setsByExercise = { ...(base.setsByExercise || {}) };
+          if (!items.find(item => (item.exerciseId || item.id) === id)) {
+            items.push(buildSessionItem(id));
+            setsByExercise[id] = [];
           }
           const nextStatus = options.status || base.status;
-          return { ...base, status: nextStatus, createdFrom: base.createdFrom || options.createdFrom || 'manual', items };
+          return { ...base, status: nextStatus, createdFrom: base.createdFrom || options.createdFrom || 'manual', items, setsByExercise };
         });
         if (options.open) {
           setActiveEquipment(id);
@@ -4188,7 +4604,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           return;
         }
         if (mode === 'library') {
-          addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', open: true, createdFrom: draftPlanToday?.createdFrom || activeSessionToday?.createdFrom || 'manual' });
+          addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', createdFrom: draftPlanToday?.createdFrom || activeSessionToday?.createdFrom || 'manual' });
           updateDraftPlanExercises(prev => Array.from(new Set([...prev, id])));
           return;
         }
@@ -4197,16 +4613,18 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const removeSessionExercise = (id) => {
         if (!id || !activeSessionToday) return;
-        const entry = activeSessionToday.items?.find(item => item.id === id);
-        const hasLoggedSets = entry?.sets > 0;
+        const entry = activeSessionToday.items?.find(item => (item.exerciseId || item.id) === id);
+        const hasLoggedSets = (activeSessionToday.setsByExercise?.[id] || []).length > 0;
         if (hasLoggedSets) {
-          const confirmed = window.confirm('Remove this exercise from today’s session? Logged sets will be removed from this session.');
+          const confirmed = window.confirm('This will remove logged sets for this exercise from today’s session.');
           if (!confirmed) return;
           removeExerciseLogsForToday(id, entry.kind);
         }
         setActiveSession(prev => {
           if (!prev || prev.date !== todayKey) return prev;
-          return { ...prev, items: (prev.items || []).filter(item => item.id !== id) };
+          const setsByExercise = { ...(prev.setsByExercise || {}) };
+          delete setsByExercise[id];
+          return { ...prev, items: (prev.items || []).filter(item => (item.exerciseId || item.id) !== id), setsByExercise };
         });
         updateDraftPlanExercises(prev => prev.filter(exId => exId !== id));
       };
@@ -4215,17 +4633,22 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         if (!activeSessionToday) return;
         const entry = activeSessionToday.items?.[index];
         if (!entry) return;
-        if (entry.sets > 0) {
-          const confirmed = window.confirm('Swap this exercise? Logged sets for it will be removed from today’s session.');
+        const entryId = entry.exerciseId || entry.id;
+        if ((activeSessionToday.setsByExercise?.[entryId] || []).length > 0) {
+          const confirmed = window.confirm('This will remove logged sets for this exercise from today’s session.');
           if (!confirmed) return;
           removeExerciseLogsForToday(entry.id, entry.kind);
         }
         setActiveSession(prev => {
           if (!prev || prev.date !== todayKey) return prev;
           const items = [...(prev.items || [])];
+          const setsByExercise = { ...(prev.setsByExercise || {}) };
           if (!items[index]) return prev;
-          items[index] = { id: newId, label: EQUIPMENT_DB[newId]?.name || 'Exercise', sets: 0, kind: 'strength' };
-          return { ...prev, items };
+          const oldId = items[index].exerciseId || items[index].id;
+          items[index] = buildSessionItem(newId);
+          if (oldId) delete setsByExercise[oldId];
+          if (!setsByExercise[newId]) setsByExercise[newId] = [];
+          return { ...prev, items, setsByExercise };
         });
         updateDraftPlanExercises(prev => {
           const updated = [...prev];
@@ -4271,10 +4694,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         recordDayEntry(sessionDay, 'workout', { exercises: Array.from(new Set([...(dayEntries[sessionDay]?.exercises || []), id])) });
         updateActiveSession({
           id,
-          label: EQUIPMENT_DB[id]?.name || 'Exercise',
-          sets: normalizedSession.sets?.length || 0,
+          name: EQUIPMENT_DB[id]?.name || 'Exercise',
           kind: 'strength'
-        });
+        }, normalizedSession.sets || []);
 
         setActiveEquipment(null);
         if (settings.insightsEnabled !== false && lastSession && newMaxWeight !== null) {
@@ -4306,10 +4728,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         recordDayEntry(dayKey, 'workout');
         updateActiveSession({
           id: `cardio_${type}`,
-          label: `Cardio: ${CARDIO_TYPES[type]?.name || 'Cardio'}`,
-          sets: 1,
+          name: `Cardio: ${CARDIO_TYPES[type]?.name || 'Cardio'}`,
           kind: 'cardio'
-        });
+        }, [enriched]);
         setActiveCardio(null);
         pushMessage('Workout saved.');
       };
@@ -4533,6 +4954,7 @@ return (
                       quoteIndex={quoteIndex}
                       lastWorkoutLabel={lastWorkoutLabel}
                       activeSession={activeSessionToday}
+                      weekWorkoutCount={weekWorkoutCount}
                     />
                   )}
                   {tab === 'workout' && (
@@ -4572,6 +4994,7 @@ return (
                       onRemoveSessionExercise={removeSessionExercise}
                       onSwapSessionExercise={swapSessionExercise}
                       sessionStartNotice={sessionStartNotice}
+                      onStartEmptySession={startEmptySession}
                     />
                   )}
                   {tab === 'profile' && (
@@ -4602,6 +5025,7 @@ return (
                 profile={profile}
                 history={history[activeEquipment] || []}
                 onSave={handleSaveSession}
+                onUpdateSessionSets={updateSessionSets}
                 onClose={() => setActiveEquipment(null)}
               />
             )}
