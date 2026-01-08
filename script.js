@@ -190,8 +190,75 @@ const { useState, useEffect, useMemo, useRef } = React;
       }
     };
 
+    const getDailyQuote = (pool, key) => {
+      if (!pool.length) return null;
+      const dayKey = toDayKey(new Date());
+      const storageKey = `ps_quote_${key}_${dayKey}`;
+      const storedIndex = storage.get(storageKey, null);
+      if (storedIndex !== null && pool[storedIndex]) return pool[storedIndex];
+      const idx = Math.floor(Math.random() * pool.length);
+      storage.set(storageKey, idx);
+      return pool[idx];
+    };
+
+    const getRandomQuote = (pool) => {
+      if (!pool.length) return null;
+      return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    const resolveMuscleGroup = (eq) => {
+      const target = (eq?.target || '').toLowerCase();
+      if (target.includes('chest') || target.includes('pec')) return 'Chest';
+      if (target.includes('back') || target.includes('lat')) return 'Back';
+      if (target.includes('leg') || target.includes('quad') || target.includes('hamstring') || target.includes('glute') || target.includes('calf') || target.includes('thigh')) return 'Legs';
+      if (target.includes('shoulder') || target.includes('delt')) return 'Shoulders';
+      if (target.includes('bicep') || target.includes('tricep') || target.includes('arm') || target.includes('forearm')) return 'Arms';
+      if (target.includes('core') || target.includes('ab')) return 'Core';
+      return 'Other';
+    };
+
+    const getLastWorkoutDate = (history = {}, cardioHistory = {}) => {
+      const dates = [];
+      Object.values(history || {}).forEach(arr => {
+        (arr || []).forEach(s => {
+          if (s?.date) dates.push(new Date(s.date));
+        });
+      });
+      Object.values(cardioHistory || {}).forEach(arr => {
+        (arr || []).forEach(s => {
+          if (s?.date) dates.push(new Date(s.date));
+        });
+      });
+      if (dates.length === 0) return null;
+      return new Date(Math.max(...dates.map(d => d.getTime())));
+    };
+
     // ========== CONSTANTS ==========
     const AVATARS = ["🦁","🦍","🦖","💪","🏃","🧘","🤖","👽","🦊","⚡"];
+
+    const HOME_QUOTES = [
+      { quote: "It’s not about being the best. It’s about being better than you were yesterday.", movie: "Creed" },
+      { quote: "We choose to go to the moon in this decade and do the other things.", movie: "First Man" },
+      { quote: "I’m just one stomach flu away from my goal weight.", movie: "The Devil Wears Prada" },
+      { quote: "Sometimes to do what’s right we have to give up the thing we want most.", movie: "Spider-Man 2" },
+      { quote: "It’s the simple things. The small steps.", movie: "Little Women" }
+    ];
+
+    const POST_WORKOUT_QUOTES = [
+      { quote: "You are what you choose to be.", movie: "The Iron Giant" },
+      { quote: "Success is peace of mind.", movie: "Coach Carter" },
+      { quote: "Every moment is a fresh beginning.", movie: "The Secret Life of Walter Mitty" },
+      { quote: "Greatness is what you do with the hand you’re dealt.", movie: "The Pursuit of Happyness" },
+      { quote: "You did good.", movie: "Good Will Hunting" }
+    ];
+
+    const REST_DAY_QUOTES = [
+      { quote: "There’s a time for daring and there’s a time for caution.", movie: "Dead Poets Society" },
+      { quote: "You’re gonna need a bigger boat.", movie: "Jaws" },
+      { quote: "The best way to predict the future is to invent it.", movie: "Back to the Future" },
+      { quote: "Stay, and help me set a new table.", movie: "Chef" },
+      { quote: "This is the beginning of a beautiful friendship.", movie: "Casablanca" }
+    ];
 
     const GYM_TYPES = {
       planet: { 
@@ -1391,14 +1458,25 @@ const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
   );
 };
 
-const Home = ({ profile, onStartWorkout, onGenerate }) => {
+const Home = ({
+  profile,
+  lastWorkoutLabel,
+  suggestedFocus,
+  onStartWorkout,
+  onGenerate,
+  onViewAnalytics,
+  onPlanTomorrow,
+  homeQuote,
+  restQuote,
+  isRestDay
+}) => {
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 home-screen">
       <div className="bg-white border-b border-gray-100 sticky top-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="p-4 py-5 flex items-center justify-between">
           <div>
             <div className="text-xs text-gray-400 font-bold uppercase tracking-wide">Planet Strength</div>
-            <h1 className="text-2xl font-black text-gray-900">Hi, {profile.username || 'Athlete'}</h1>
+            <h1 className="text-2xl font-black text-gray-900">Welcome back, {profile.username || 'Athlete'}</h1>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl border border-purple-200">
             {profile.avatar}
@@ -1406,28 +1484,76 @@ const Home = ({ profile, onStartWorkout, onGenerate }) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-        <div className="text-sm text-gray-500 font-semibold">Keep it simple today.</div>
-        <div className="space-y-3">
-          <button
-            onClick={onStartWorkout}
-            className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-lg shadow-lg active:scale-95 transition-all"
-          >
-            Start Today
-          </button>
-          <button
-            onClick={onGenerate}
-            className="w-full py-4 rounded-2xl border border-purple-200 text-purple-700 font-bold text-lg bg-white active:scale-95 transition-all"
-          >
-            Quick Generate
-          </button>
-        </div>
+      <div className="flex-1 p-4 pb-6 home-content">
+        {isRestDay ? (
+          <div className="space-y-4">
+            <div className="rest-card">
+              <div className="text-xs font-bold uppercase text-gray-500">Rest Day</div>
+              <h2 className="text-lg font-black text-gray-900">Rest Day</h2>
+              <p className="text-sm text-gray-500">Recovery helps you come back stronger.</p>
+              {restQuote && (
+                <div className="quote-block">
+                  <p className="quote-text">“{restQuote.quote}”</p>
+                  <p className="quote-meta">— {restQuote.movie}</p>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={onViewAnalytics} className="home-secondary-button">
+                View analytics
+              </button>
+              <button onClick={onPlanTomorrow} className="home-secondary-button">
+                Browse exercises
+              </button>
+            </div>
+            <button onClick={onPlanTomorrow} className="home-primary-button">
+              Resume training tomorrow
+            </button>
+          </div>
+        ) : (
+          <div className="home-stack">
+            <div className="text-sm text-gray-500 font-semibold">Keep it simple today.</div>
+            <div className="home-card-row">
+              <div className="home-mini-card">
+                <div className="text-xs uppercase text-gray-400 font-bold">Last workout</div>
+                <div className="text-lg font-black text-gray-900">{lastWorkoutLabel || 'No logs yet'}</div>
+              </div>
+              <div className="home-mini-card">
+                <div className="text-xs uppercase text-gray-400 font-bold">Suggested focus</div>
+                <div className="text-lg font-black text-gray-900">{suggestedFocus}</div>
+              </div>
+            </div>
+            <button
+              onClick={onStartWorkout}
+              className="home-primary-button"
+            >
+              Start Today
+            </button>
+            <div className="home-quick-generate no-scrollbar">
+              {['Push', 'Pull', 'Legs', 'Full Body', 'Surprise Me'].map(label => (
+                <button
+                  key={label}
+                  onClick={() => onGenerate(label)}
+                  className="quick-chip"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {homeQuote && (
+              <div className="quote-block subtle">
+                <p className="quote-text">“{homeQuote.quote}”</p>
+                <p className="quote-meta">— {homeQuote.movie}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, onLogRestDay, restDayLogged, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused, onRemoveSessionExercise, onSwapSessionExercise, sessionStartNotice, onStartEmptySession }) => {
+const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, setSettings, todayWorkoutType, pinnedExercises, setPinnedExercises, recentExercises, draftPlan, onRegenerateDraft, onSwapDraftExercise, onStartWorkoutFromBuilder, onHideDraft, hasWorkoutToday, dismissedDraftDate, activeSession, onFinishSession, activeEquipment, generatorOptions, setGeneratorOptions, focusDraft, onDraftFocused, onRemoveDraftExercise, onClearDraft, onAddExerciseFromSearch, onPushMessage, focusSession, onSessionFocused, onRemoveSessionExercise, onSwapSessionExercise, sessionStartNotice, onStartEmptySession, isRestDay, restQuote }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapState, setSwapState] = useState(null);
@@ -1523,6 +1649,10 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
   useEffect(() => {
     setLibraryVisible(settings.showAllExercises);
   }, [settings.showAllExercises]);
+
+  useEffect(() => {
+    if (isRestDay) setLibraryVisible(true);
+  }, [isRestDay]);
 
   useEffect(() => {
     if (!draftPlan) setDraftCollapsed(false);
@@ -1629,12 +1759,14 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           >
             {pinnedExercises.includes(id) ? 'Pinned' : 'Pin'}
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); (onAction ? onAction(id) : onAddExerciseFromSearch?.(id)); }}
-            className="text-purple-600 font-semibold text-sm"
-          >
-            {actionLabel}
-          </button>
+          {!isRestDay && (
+            <button
+              onClick={(e) => { e.stopPropagation(); (onAction ? onAction(id) : onAddExerciseFromSearch?.(id)); }}
+              className="text-purple-600 font-semibold text-sm"
+            >
+              {actionLabel}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -1659,12 +1791,14 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           >
             {pinned ? 'Pinned' : 'Pin'}
           </button>
-          <button
-            onClick={() => onAddExerciseFromSearch?.(id)}
-            className="tile-action primary"
-          >
-            Add
-          </button>
+          {!isRestDay && (
+            <button
+              onClick={() => onAddExerciseFromSearch?.(id)}
+              className="tile-action primary"
+            >
+              Add
+            </button>
+          )}
         </div>
       </div>
     );
@@ -1728,15 +1862,8 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
         <div className="px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black workout-title">Workout</h1>
-            <div className="text-xs workout-muted font-bold">Search + pins + recents</div>
+            <div className="text-xs workout-muted font-bold">{isRestDay ? 'Rest day mode' : 'Search + pins + recents'}</div>
           </div>
-          <button
-            onClick={onLogRestDay}
-            disabled={restDayLogged || hasWorkoutToday}
-            className={`px-3 py-2 rounded-xl text-sm font-bold border ${restDayLogged ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-white text-purple-700 border-purple-200'}`}
-          >
-            😴 Log Rest Day
-          </button>
         </div>
         <div className="px-4 pb-4">
           <div className="relative">
@@ -1744,12 +1871,12 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={isSessionMode ? 'Add exercises to today’s workout...' : 'Search exercises...'}
+              placeholder={isRestDay ? 'Browse exercises...' : (isSessionMode ? 'Add exercises to today’s workout...' : 'Search exercises...')}
               ref={searchInputRef}
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
           </div>
-          {!libraryVisible && !showStartPrompt && (
+          {!libraryVisible && showStartPrompt && !isRestDay && (
             <button
               onClick={() => setLibraryVisible(true)}
               className="mt-2 text-xs font-bold text-purple-700 underline"
@@ -1761,7 +1888,26 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
       </div>
 
       <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4 workout-scroll">
-        {showStartPrompt && !searchQuery && (
+        {isRestDay && (
+          <Card className="space-y-3 workout-card mt-5">
+            <div>
+              <div className="text-xs font-bold workout-muted uppercase">Rest Day</div>
+              <div className="text-base font-black workout-heading">Rest Day</div>
+            </div>
+            <div className="text-sm text-gray-500">Recovery helps you come back stronger.</div>
+            {restQuote && (
+              <div className="quote-block subtle">
+                <p className="quote-text">“{restQuote.quote}”</p>
+                <p className="quote-meta">— {restQuote.movie}</p>
+              </div>
+            )}
+            <button className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold">
+              Resume training tomorrow
+            </button>
+          </Card>
+        )}
+
+        {!isRestDay && showStartPrompt && !searchQuery && (
           <Card className="space-y-3 workout-card mt-5">
             <div>
               <div className="text-xs font-bold workout-muted uppercase">Start Today</div>
@@ -1788,7 +1934,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </Card>
         )}
 
-        {searchQuery && (
+        {searchQuery && !hasTodayWorkout && (
           <div ref={searchResultsRef}>
             <Card className="space-y-2 workout-card">
               <div className="text-xs font-bold workout-muted uppercase">Search Results</div>
@@ -1803,7 +1949,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </div>
         )}
 
-        {hasTodayWorkout && (
+        {!isRestDay && hasTodayWorkout && (
           <Card className="space-y-3 workout-card" ref={sessionCardRef}>
             <div className="flex items-center justify-between">
               <div>
@@ -1854,6 +2000,18 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                 )})}
               </div>
             )}
+            {searchQuery && (
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <div className="text-xs font-bold workout-muted uppercase">Search Results</div>
+                {searchResults.length > 0 ? (
+                  <div className="space-y-2">
+                    {searchResults.map(id => renderExerciseRow(id, 'Add', handleSearchAdd))}
+                  </div>
+                ) : (
+                  <div className="text-xs workout-muted">No matches yet. Try a different keyword.</div>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <button
                 onClick={() => searchInputRef.current?.focus()}
@@ -1873,10 +2031,11 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </Card>
         )}
 
+        {(isRestDay || (!hasTodayWorkout && (libraryVisible || searchQuery))) && (
         <Card className="space-y-2 workout-card">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold workout-muted uppercase">Pinned Exercises</div>
-            <div className="text-xs workout-muted">Tap to add</div>
+            <div className="text-xs workout-muted">{isRestDay ? 'Pin for tomorrow' : 'Tap to add'}</div>
           </div>
           {filteredPinned.length === 0 ? (
             <div className="text-xs workout-muted">Pin your go-tos for quick access.</div>
@@ -1886,8 +2045,9 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
             </div>
           )}
         </Card>
+        )}
 
-        {isPlanMode && filteredRecents.length > 0 && (
+        {!isRestDay && isPlanMode && filteredRecents.length > 0 && !hasTodayWorkout && (
           <Card className="space-y-2 workout-card">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Recent</div>
@@ -1899,7 +2059,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </Card>
         )}
 
-        {libraryVisible && (
+        {libraryVisible && !hasTodayWorkout && (
           <Card className="space-y-2 workout-card">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Full Library</div>
@@ -1922,24 +2082,6 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
           </Card>
         )}
 
-        {Object.keys(CARDIO_TYPES).length > 0 && (
-          <Card className="space-y-2 workout-card">
-            <div className="text-xs font-bold workout-muted uppercase">Cardio</div>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(CARDIO_TYPES).map(([key, data]) => (
-                <button
-                  key={key}
-                  onClick={() => onOpenCardio(key)}
-                  className="p-3 rounded-xl border border-gray-200 bg-white text-left active:scale-[0.98] transition"
-                >
-                  <div className="text-lg">{data.emoji}</div>
-                  <div className="font-bold workout-heading text-sm">{data.name}</div>
-                  <div className="text-[11px] workout-muted">Track time + distance</div>
-                </button>
-              ))}
-            </div>
-          </Card>
-        )}
       </div>
 
       {isSessionMode && (
@@ -2703,7 +2845,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const [selectedEquipment, setSelectedEquipment] = useState(null);
       const [analyticsTab, setAnalyticsTab] = useState('overview');
       const [exerciseHistoryQuery, setExerciseHistoryQuery] = useState('');
-      const [exerciseHistorySelected, setExerciseHistorySelected] = useState(null);
+      const [exerciseHistoryExpanded, setExerciseHistoryExpanded] = useState(null);
 
       const allEquipment = Object.keys(EQUIPMENT_DB);
       const combinedSessions = useMemo(() => {
@@ -2902,7 +3044,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-xs font-bold text-gray-500 uppercase">Exercise History</div>
-                      <div className="text-sm text-gray-500">Explore your logged sets.</div>
+                      <div className="text-sm text-gray-500">Tap to expand past sets.</div>
                     </div>
                     <Icon name="Search" className="w-4 h-4 text-gray-400" />
                   </div>
@@ -2919,64 +3061,53 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                       return <div className="text-sm text-gray-500 text-center py-4">No exercises match yet.</div>;
                     }
                     return (
-                      <div className="exercise-grid">
+                      <div className="exercise-history-grid">
                         {filtered.map(id => {
                           const eq = EQUIPMENT_DB[id];
-                          const sessions = history[id] || [];
+                          const sessions = (history[id] || []).slice(-6).reverse();
+                          const isExpanded = exerciseHistoryExpanded === id;
                           return (
-                            <button
-                              key={id}
-                              onClick={() => setExerciseHistorySelected(id)}
-                              className="tile text-left"
-                            >
-                              <div className="text-xs font-bold text-gray-900">{eq.name}</div>
-                              <div className="text-[10px] text-gray-500">{sessions.length} sessions</div>
-                            </button>
+                            <div key={id} className={`exercise-history-card ${isExpanded ? 'expanded' : ''}`}>
+                              <button
+                                onClick={() => setExerciseHistoryExpanded(isExpanded ? null : id)}
+                                className="exercise-history-toggle"
+                              >
+                                <div>
+                                  <div className="text-xs font-bold text-gray-900">{eq.name}</div>
+                                  <div className="text-[10px] text-gray-500">{sessions.length} sessions</div>
+                                </div>
+                                <Icon name={isExpanded ? 'ChevronDown' : 'ChevronRight'} className="w-4 h-4 text-gray-400" />
+                              </button>
+                              {isExpanded && (
+                                <div className="exercise-history-detail">
+                                  {sessions.length === 0 ? (
+                                    <div className="text-xs text-gray-500">No sessions logged yet.</div>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {sessions.map((session, idx) => {
+                                        const summary = (session.sets || []).map(set => `${set.reps}×${set.weight}`).join(', ');
+                                        return (
+                                          <div key={idx} className="p-2 rounded-lg border border-gray-200 bg-white">
+                                            <div className="text-[11px] font-bold text-gray-900">
+                                              {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500">{(session.sets || []).length} sets</div>
+                                            <div className="text-[11px] text-gray-700">{summary || 'No sets logged.'}</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                  <div className="text-[10px] text-gray-400 mt-2">Videos coming later.</div>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
                     );
                   })()}
                 </Card>
-                {exerciseHistorySelected && (() => {
-                  const eq = EQUIPMENT_DB[exerciseHistorySelected];
-                  const sessions = (history[exerciseHistorySelected] || []).slice(-6).reverse();
-                  return (
-                    <Card className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-gray-500 uppercase">History Detail</div>
-                          <div className="text-base font-black text-gray-900">{eq?.name}</div>
-                        </div>
-                        <button
-                          onClick={() => setExerciseHistorySelected(null)}
-                          className="text-xs font-bold text-gray-500"
-                        >
-                          Close
-                        </button>
-                      </div>
-                      {sessions.length === 0 ? (
-                        <div className="text-sm text-gray-500">No sessions logged yet.</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {sessions.map((session, idx) => {
-                            const summary = (session.sets || []).map(set => `${set.reps}×${set.weight}`).join(', ');
-                            return (
-                              <div key={idx} className="p-3 rounded-xl border border-gray-200 bg-white">
-                                <div className="text-xs font-bold text-gray-900">
-                                  {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </div>
-                                <div className="text-[11px] text-gray-500">{(session.sets || []).length} sets</div>
-                                <div className="text-sm text-gray-700">{summary || 'No sets logged.'}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="text-[11px] text-gray-500">Videos coming later.</div>
-                    </Card>
-                  );
-                })()}
               </>
             ) : !selectedEquipment ? (
               <>
@@ -3140,36 +3271,17 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     };
 
     // ========== PROFILE TAB ==========
-    const ProfileView = ({ profile, setProfile, settings, setSettings, onReset, onResetOnboarding, onExportData, onImportData, streakObj, workoutCount = 0, restDayCount = 0, onViewAnalytics }) => {
-      const [editing, setEditing] = useState(false);
+    const ProfileView = ({ settings, setSettings, onViewAnalytics }) => {
       const [workoutOpen, setWorkoutOpen] = useState(true);
       const [appearanceOpen, setAppearanceOpen] = useState(false);
       const [analyticsOpen, setAnalyticsOpen] = useState(true);
-      const [learnOpen, setLearnOpen] = useState(false);
+      const [learnOpen, setLearnOpen] = useState(true);
       const [aboutOpen, setAboutOpen] = useState(true);
-      const [musicOpen, setMusicOpen] = useState(false);
-      const [profileOpen, setProfileOpen] = useState(false);
-      const [dataOpen, setDataOpen] = useState(false);
-      const [draft, setDraft] = useState(profile);
-
-      useEffect(() => setDraft(profile), [profile]);
-
-      const saveProfile = () => {
-        if (!draft.username || !draft.avatar || !draft.workoutLocation) return;
-        setProfile({ ...profile, ...draft });
-        setEditing(false);
-      };
 
       const accentOptions = [
         { id: 'purple', label: 'Purple', color: '#8B5CF6' },
         { id: 'red', label: 'Dark Red', color: '#B91C1C' },
         { id: 'gold', label: 'Gold', color: '#D97706' },
-      ];
-
-      const locations = [
-        { id: 'gym', label: 'Gym', detail: 'Commercial or local gym', gymType: 'commercial' },
-        { id: 'home', label: 'Home', detail: 'Garage or apartment setup', gymType: 'home' },
-        { id: 'other', label: 'Other', detail: 'Hotel, park, travel', gymType: 'commercial' },
       ];
 
       const learnItems = [
@@ -3337,164 +3449,6 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
               )}
             </Card>
 
-            <Card className="space-y-3">
-              <button onClick={() => setMusicOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Music shortcuts</div>
-                  <div className="text-sm text-gray-500">Open your player</div>
-                </div>
-                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${musicOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {musicOpen && (
-                <div className="space-y-2 animate-expand">
-                  <a href="https://music.apple.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                    Apple Music
-                  </a>
-                  <a href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                    Spotify
-                  </a>
-                  <a href="https://music.youtube.com/" target="_blank" rel="noopener noreferrer" className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold text-sm bg-white">
-                    YouTube Music
-                  </a>
-                </div>
-              )}
-            </Card>
-
-            <Card className="space-y-3">
-              <button onClick={() => setProfileOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Profile</div>
-                  <div className="text-sm text-gray-500">Edit name, emoji, location</div>
-                </div>
-                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {profileOpen && (
-                <div className="space-y-3 animate-expand">
-                  <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-3xl shadow">{profile.avatar}</div>
-                      <div>
-                        <div className="text-xs font-bold text-gray-500 uppercase">Name</div>
-                        <div className="text-lg font-black text-gray-900">{profile.username || 'Athlete'}</div>
-                        <div className="text-xs text-gray-500">{locations.find(l => l.id === profile.workoutLocation)?.label || 'Gym'}</div>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <div className="text-xs font-bold text-gray-500 uppercase">Streak</div>
-                        <div className="text-xl font-black text-purple-700">{streakObj?.current || 0} days</div>
-                        <div className="text-[11px] text-gray-500">Best {streakObj?.best || 0}</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-4 text-center text-xs text-gray-600">
-                      <div className="bg-white rounded-xl p-2 border border-gray-100">
-                        <div className="font-black text-gray-900 text-lg">{workoutCount}</div>
-                        <div>Workouts logged</div>
-                      </div>
-                      <div className="bg-white rounded-xl p-2 border border-gray-100">
-                        <div className="font-black text-gray-900 text-lg">{restDayCount}</div>
-                        <div>Rest days</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-gray-500 uppercase">Edit profile</div>
-                      <div className="text-sm text-gray-500">Name, emoji, location, onboarding</div>
-                    </div>
-                    <button onClick={() => setEditing(!editing)} className="text-purple-600 font-bold text-sm">{editing ? 'Close' : 'Edit'}</button>
-                  </div>
-                  {editing && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Name</label>
-                        <input
-                          value={draft.username}
-                          onChange={(e) => setDraft({ ...draft, username: e.target.value })}
-                          className="w-full p-3 border border-gray-200 rounded-xl font-semibold"
-                          placeholder="Your name"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Emoji avatar</label>
-                        <div className="grid grid-cols-5 gap-2">
-                          {AVATARS.map(emoji => (
-                            <button
-                              key={emoji}
-                              onClick={() => setDraft({ ...draft, avatar: emoji })}
-                              className={`p-2 rounded-xl text-2xl ${draft.avatar === emoji ? 'bg-purple-50 border-2 border-purple-400' : 'bg-white border border-gray-200'}`}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Where are you working out?</label>
-                        <div className="space-y-2">
-                          {locations.map(loc => (
-                            <button
-                              key={loc.id}
-                              onClick={() => setDraft({ ...draft, workoutLocation: loc.id, gymType: loc.gymType })}
-                              className={`w-full p-3 rounded-xl border-2 text-left ${draft.workoutLocation === loc.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white'}`}
-                            >
-                              <div className="font-bold text-sm text-gray-900">{loc.label}</div>
-                              <div className="text-xs text-gray-500">{loc.detail}</div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <button
-                        onClick={saveProfile}
-                        disabled={!draft.username || !draft.avatar || !draft.workoutLocation}
-                        className={`w-full py-3 rounded-xl font-bold text-white ${draft.username && draft.avatar && draft.workoutLocation ? 'bg-purple-600' : 'bg-gray-300 cursor-not-allowed'}`}
-                      >
-                        Save Profile
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    onClick={onResetOnboarding}
-                    className="w-full p-3 rounded-xl border border-gray-200 text-left font-semibold flex items-center justify-between"
-                  >
-                    <span>Reset onboarding</span>
-                    <Icon name="RefreshCw" className="w-4 h-4 text-gray-500" />
-                  </button>
-                </div>
-              )}
-            </Card>
-
-            <Card className="space-y-3">
-              <button onClick={() => setDataOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Data</div>
-                  <div className="text-sm text-gray-500">Backup and reset</div>
-                </div>
-                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${dataOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {dataOpen && (
-                <div className="space-y-3 animate-expand">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={onExportData}
-                      className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
-                    >
-                      Export
-                    </button>
-                    <button
-                      onClick={onImportData}
-                      className="p-3 rounded-xl border border-gray-200 font-bold text-sm bg-white"
-                    >
-                      Import
-                    </button>
-                  </div>
-                  <button
-                    onClick={onReset}
-                    className="w-full p-3 rounded-xl border border-red-200 text-red-700 font-bold bg-red-50"
-                  >
-                    Clear all data
-                  </button>
-                </div>
-              )}
-            </Card>
           </div>
         </div>
       );
@@ -3691,6 +3645,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [focusSession, setFocusSession] = useState(false);
       const [sessionStartNotice, setSessionStartNotice] = useState(null);
       const sessionStartTimerRef = useRef(null);
+      const [showPostWorkout, setShowPostWorkout] = useState(false);
+      const [postWorkoutQuote, setPostWorkoutQuote] = useState(null);
+      const postWorkoutTimerRef = useRef(null);
 
       const [appState, setAppState] = useState({
         lastWorkoutType: null,
@@ -3849,8 +3806,26 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }
       }, [profile, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_settings', settings); }, [settings, loaded]);
-      useEffect(() => { if(loaded) storage.set('ps_v2_history', history); }, [history, loaded]);
-      useEffect(() => { if(loaded) storage.set('ps_v2_cardio', cardioHistory); }, [cardioHistory, loaded]);
+      useEffect(() => {
+        if (!loaded) return;
+        const persist = () => storage.set('ps_v2_history', history);
+        if (typeof requestIdleCallback === 'function') {
+          const idleId = requestIdleCallback(persist);
+          return () => cancelIdleCallback(idleId);
+        }
+        const timeoutId = setTimeout(persist, 0);
+        return () => clearTimeout(timeoutId);
+      }, [history, loaded]);
+      useEffect(() => {
+        if (!loaded) return;
+        const persist = () => storage.set('ps_v2_cardio', cardioHistory);
+        if (typeof requestIdleCallback === 'function') {
+          const idleId = requestIdleCallback(persist);
+          return () => cancelIdleCallback(idleId);
+        }
+        const timeoutId = setTimeout(persist, 0);
+        return () => clearTimeout(timeoutId);
+      }, [cardioHistory, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_v2_state', appState); }, [appState, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_dismissed_draft_date', dismissedDraftDate); }, [dismissedDraftDate, loaded]);
       useEffect(() => {
@@ -3972,35 +3947,31 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const todayWorkoutType = useMemo(() => getTodaysWorkoutType(history, appState), [history, appState]);
 
       const strengthScoreObj = useMemo(() => {
+        if (!showAnalytics) {
+          return { score: 0, avgPct: 0, coveragePct: 0, loggedCount: 0, total: Object.keys(EQUIPMENT_DB).length };
+        }
         if (!profile?.onboarded) return { score: 0, avgPct: 0, coveragePct: 0, loggedCount: 0, total: Object.keys(EQUIPMENT_DB).length };
         return computeStrengthScore(profile, history);
-      }, [profile, history]);
+      }, [profile, history, showAnalytics]);
 
       const streakObj = useMemo(() => computeStreak(history, cardioHistory, appState?.restDays || [], dayEntries), [history, cardioHistory, appState?.restDays, dayEntries]);
 
-      const achievements = useMemo(() => computeAchievements({ history, cardioHistory, strengthScoreObj, streakObj }), [history, cardioHistory, strengthScoreObj, streakObj]);
+      const achievements = useMemo(() => {
+        if (!showAnalytics) return [];
+        return computeAchievements({ history, cardioHistory, strengthScoreObj, streakObj });
+      }, [history, cardioHistory, strengthScoreObj, streakObj, showAnalytics]);
+
+      const lastWorkoutDate = useMemo(() => getLastWorkoutDate(history, cardioHistory), [history, cardioHistory]);
 
       const lastWorkoutLabel = useMemo(() => {
-        const dates = [];
-        Object.values(history || {}).forEach(arr => {
-          (arr || []).forEach(s => {
-            if (s?.date) dates.push(new Date(s.date));
-          });
-        });
-        Object.values(cardioHistory || {}).forEach(arr => {
-          (arr || []).forEach(s => {
-            if (s?.date) dates.push(new Date(s.date));
-          });
-        });
-        if (dates.length === 0) return null;
-        const lastDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        if (!lastWorkoutDate) return null;
         const today = new Date();
-        const diffDays = Math.floor((today - lastDate) / 86400000);
+        const diffDays = Math.floor((today - lastWorkoutDate) / 86400000);
         if (diffDays === 0) return 'Today';
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;
-        return lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      }, [history, cardioHistory]);
+        return lastWorkoutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }, [lastWorkoutDate]);
 
       const weekWorkoutCount = useMemo(() => {
         const today = new Date();
@@ -4037,9 +4008,35 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const todayKey = toDayKey(new Date());
       const hasWorkoutToday = dayEntries?.[todayKey]?.type === 'workout';
-      const restDayLogged = dayEntries?.[todayKey]?.type === 'rest';
       const activeSessionToday = activeSession?.date === todayKey ? activeSession : null;
       const draftPlanToday = draftPlan?.date === todayKey ? draftPlan : null;
+      const lastWorkoutHoursAgo = lastWorkoutDate ? (Date.now() - lastWorkoutDate.getTime()) / 36e5 : null;
+      const isRestDay = !activeSessionToday && lastWorkoutHoursAgo !== null && lastWorkoutHoursAgo <= 36;
+      const homeQuote = useMemo(() => getDailyQuote(HOME_QUOTES, 'home'), [todayKey]);
+      const restQuote = useMemo(() => getDailyQuote(REST_DAY_QUOTES, 'rest'), [todayKey]);
+      const suggestedFocus = useMemo(() => {
+        const muscleGroups = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+        const workoutDays = Object.entries(dayEntries || {})
+          .filter(([, entry]) => entry?.type === 'workout')
+          .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+          .slice(0, 2);
+        if (workoutDays.length === 0) return 'Full Body';
+        const used = new Set();
+        workoutDays.forEach(([, entry]) => {
+          (entry.exercises || []).forEach(id => {
+            const group = resolveMuscleGroup(EQUIPMENT_DB[id]);
+            if (group) used.add(group);
+          });
+        });
+        const remaining = muscleGroups.filter(group => !used.has(group));
+        return remaining[0] || 'Full Body';
+      }, [dayEntries]);
+
+      useEffect(() => {
+        if (!isRestDay) return;
+        setActiveEquipment(null);
+        setActiveCardio(null);
+      }, [isRestDay]);
       const createEmptySession = (overrides = {}) => ({
         date: todayKey,
         status: 'draft',
@@ -4203,6 +4200,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveEquipment(null);
         setActiveCardio(null);
         setSessionStartNotice(null);
+        const chosenQuote = getRandomQuote(POST_WORKOUT_QUOTES);
+        setPostWorkoutQuote(chosenQuote);
+        setShowPostWorkout(true);
+        if (postWorkoutTimerRef.current) clearTimeout(postWorkoutTimerRef.current);
+        postWorkoutTimerRef.current = setTimeout(() => setShowPostWorkout(false), 1600);
+        setTab('home');
         pushMessage('Workout saved.');
       };
 
@@ -4262,6 +4265,10 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const triggerGenerator = (type) => {
+        if (isRestDay) {
+          setTab('home');
+          return;
+        }
         if (activeSessionToday?.status === 'active') {
           setTab('workout');
           return;
@@ -4350,7 +4357,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const startWorkoutFromBuilder = () => {
-        if (!activeSessionToday) return;
+        if (isRestDay || !activeSessionToday) return;
         ensureWorkoutDayEntry((activeSessionToday.items || []).map(item => item.exerciseId || item.id));
         setActiveSession(prev => {
           if (!prev || prev.date !== todayKey) return prev;
@@ -4358,16 +4365,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         });
       };
 
-      const handleLogRestDay = () => {
-        if (hasWorkoutToday || restDayLogged) return;
-        recordDayEntry(todayKey, 'rest');
-        setAppState(prev => ({
-          ...(prev || {}),
-          restDays: Array.from(new Set([...(prev?.restDays || []), todayKey]))
-        }));
-      };
-
       const handleStartWorkout = () => {
+        if (isRestDay) return;
         setTab('workout');
         if (activeSessionToday?.status === 'active') {
           return;
@@ -4378,6 +4377,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const startEmptySession = () => {
+        if (isRestDay) return;
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: 'manual' }) : prev;
           return { ...base, status: 'draft' };
@@ -4390,6 +4390,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const addExerciseToSession = (id, options = {}) => {
+        if (isRestDay) return;
         if (!id) return;
         setActiveSession(prev => {
           const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: options.createdFrom || 'manual' }) : prev;
@@ -4408,12 +4409,14 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const addExerciseFromSearch = (id) => {
+        if (isRestDay) return;
         if (!id) return;
         addExerciseToSession(id, { status: activeSessionToday?.status === 'active' ? 'active' : 'draft' });
         showToast('Added to today’s workout');
       };
 
       const handleSelectExercise = (id, mode, options = {}) => {
+        if (isRestDay) return;
         if (options.createDraftOnly) {
           createEmptyDraft();
           return;
@@ -4477,6 +4480,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const handleSaveSession = (id, session) => {
+        if (isRestDay) return;
         if (!session) return;
         const normalizedSession = {
           ...session,
@@ -4528,6 +4532,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const handleSaveCardioSession = (type, session) => {
+        if (isRestDay) return;
         const durationMinutes = session.duration || (session.timeSeconds ? Math.round(session.timeSeconds / 60) : null);
         const enriched = { ...session, duration: durationMinutes, type: 'cardio', cardioType: type, sets: [] };
         setCardioHistory(prev => ({
@@ -4739,6 +4744,20 @@ return (
             <div className="flex-1 overflow-hidden">
               <InlineMessage message={inlineMessage} />
               <Toast message={toastMessage} />
+              {showPostWorkout && (
+                <div className="post-workout-screen">
+                  <div className="post-workout-card">
+                    <div className="text-xs font-bold text-gray-400 uppercase">Session</div>
+                    <div className="text-2xl font-black text-gray-900">Workout saved.</div>
+                    {postWorkoutQuote && (
+                      <div className="quote-block subtle">
+                        <p className="quote-text">“{postWorkoutQuote.quote}”</p>
+                        <p className="quote-meta">— {postWorkoutQuote.movie}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {showAnalytics ? (
                 <div className="h-full flex flex-col bg-gray-50">
                   <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
@@ -4764,9 +4783,24 @@ return (
                   {tab === 'home' && (
                     <Home
                       profile={profile}
-                      streakObj={streakObj}
+                      lastWorkoutLabel={lastWorkoutLabel}
+                      suggestedFocus={suggestedFocus}
                       onStartWorkout={handleStartWorkout}
-                      onGenerate={() => triggerGenerator('surprise')}
+                      onGenerate={(label) => {
+                        const map = {
+                          'Push': 'push',
+                          'Pull': 'pull',
+                          'Legs': 'legs',
+                          'Full Body': 'full',
+                          'Surprise Me': 'surprise'
+                        };
+                        triggerGenerator(map[label] || 'surprise');
+                      }}
+                      onViewAnalytics={() => setShowAnalytics(true)}
+                      onPlanTomorrow={() => setTab('workout')}
+                      homeQuote={homeQuote}
+                      restQuote={restQuote}
+                      isRestDay={isRestDay}
                     />
                   )}
                   {tab === 'workout' && (
@@ -4786,8 +4820,6 @@ return (
                       onSwapDraftExercise={swapDraftExercise}
                       onStartWorkoutFromBuilder={startWorkoutFromBuilder}
                       onHideDraft={(value) => setDismissedDraftDate(value)}
-                      onLogRestDay={handleLogRestDay}
-                      restDayLogged={restDayLogged}
                       hasWorkoutToday={hasWorkoutToday}
                       dismissedDraftDate={dismissedDraftDate}
                       activeSession={activeSessionToday}
@@ -4807,21 +4839,14 @@ return (
                       onSwapSessionExercise={swapSessionExercise}
                       sessionStartNotice={sessionStartNotice}
                       onStartEmptySession={startEmptySession}
+                      isRestDay={isRestDay}
+                      restQuote={restQuote}
                     />
                   )}
                   {tab === 'profile' && (
                     <ProfileView
-                      profile={profile}
-                      setProfile={setProfile}
                       settings={settings}
                       setSettings={setSettings}
-                      onReset={handleReset}
-                      onResetOnboarding={handleResetOnboarding}
-                      onExportData={handleExportData}
-                      onImportData={handleImportData}
-                      streakObj={streakObj}
-                      workoutCount={Object.values(history || {}).reduce((sum, sessions) => sum + (sessions?.length || 0), 0)}
-                      restDayCount={Object.values(dayEntries || {}).filter(d => d.type === 'rest').length}
                       onViewAnalytics={() => setShowAnalytics(true)}
                     />
                   )}
