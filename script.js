@@ -1319,12 +1319,6 @@ const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
     { id: 'quick', label: 'Quick' }
   ];
   const durationOptions = [30, 45, 60];
-  const equipmentOptions = [
-    { id: 'machines', label: 'Machines' },
-    { id: 'free', label: 'Free weights' },
-    { id: 'mixed', label: 'Mixed' }
-  ];
-
   const toggleOption = (key, value) => {
     onUpdate(prev => ({ ...prev, [key]: prev[key] === value ? '' : value }));
   };
@@ -1351,17 +1345,6 @@ const GeneratorOptions = ({ options, onUpdate, compact = false }) => {
             className={`filter-chip ${options.duration === value ? 'active' : ''}`}
           >
             {value} min
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {equipmentOptions.map(opt => (
-          <button
-            key={opt.id}
-            onClick={() => toggleOption('equipment', opt.id)}
-            className={`filter-chip ${options.equipment === opt.id ? 'active' : ''}`}
-          >
-            {opt.label}
           </button>
         ))}
       </div>
@@ -1818,7 +1801,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
 
       <div className="flex-1 overflow-y-auto pb-28 px-4 space-y-4 workout-scroll">
         {showStartHere && (
-          <Card className="space-y-3 workout-card mt-4">
+          <Card className="space-y-3 workout-card mt-5">
             <div>
               <div className="text-xs font-bold workout-muted uppercase">Start here</div>
               <div className="text-base font-black workout-heading">Build today’s session</div>
@@ -1910,7 +1893,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-xs font-bold text-purple-600">{entrySetCount} {entry.kind === 'cardio' ? 'entries' : 'sets'}</div>
-                      {activeSession?.createdFrom === 'generated' && entry.kind !== 'cardio' && (
+                      {entry.kind !== 'cardio' && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setSwapState({ mode: 'session', index: idx }); }}
                           className="session-action-button"
@@ -1947,7 +1930,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
                 <button onClick={() => onHideDraft(null)} className="text-purple-700 font-bold text-sm">Show</button>
               </Card>
             ) : (
-              <Card className="space-y-4 workout-card" ref={draftCardRef}>
+              <Card className="space-y-4 workout-card plan-card" ref={draftCardRef}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -2949,13 +2932,13 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
             <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
               <defs>
                 <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#9333ea" />
-                  <stop offset="100%" stopColor="#6366f1" />
+                  <stop offset="0%" stopColor="var(--accent)" />
+                  <stop offset="100%" stopColor="var(--accent-hover)" />
                 </linearGradient>
               </defs>
               <path d={linePath} fill="none" stroke="url(#lineGradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
               {points.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r="4" fill="white" stroke="#9333ea" strokeWidth="2" />
+                <circle key={i} cx={p.x} cy={p.y} r="4" fill="white" stroke="var(--accent)" strokeWidth="2" />
               ))}
             </svg>
             <div className="flex justify-between items-center mt-2 text-[11px] text-gray-500 font-semibold">
@@ -2967,7 +2950,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       };
 
       return (
-        <div className="flex flex-col h-full bg-gray-50">
+        <div className="flex flex-col h-full bg-gray-50 analytics-shell">
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="p-4">
               <h1 className="text-2xl font-black text-gray-900">Analytics</h1>
@@ -3896,7 +3879,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       const [dismissedDraftDate, setDismissedDraftDate] = useState(null);
       const [focusDraft, setFocusDraft] = useState(false);
       const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * motivationalQuotes.length));
-      const [generatorOptions, setGeneratorOptions] = useState({ goal: '', duration: '', equipment: '' });
+      const [generatorOptions, setGeneratorOptions] = useState({ goal: '', duration: 45, equipment: '' });
 
       const normalizeActiveSession = (session) => {
         if (!session) return null;
@@ -4277,9 +4260,12 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           };
           if (idx >= 0) items[idx] = updatedItem;
           else items.push(updatedItem);
+          const nextStatus = base.status === 'in_progress'
+            ? 'in_progress'
+            : (resolvedSets.length > 0 && base.createdFrom !== 'generated' ? 'in_progress' : base.status);
           return {
             ...base,
-            status: resolvedSets.length > 0 ? 'in_progress' : base.status,
+            status: nextStatus,
             items,
             setsByExercise
           };
@@ -4603,12 +4589,6 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', open: true });
           return;
         }
-        if (mode === 'library') {
-          addExerciseToSession(id, { status: activeSessionToday?.status || 'draft', createdFrom: draftPlanToday?.createdFrom || activeSessionToday?.createdFrom || 'manual' });
-          updateDraftPlanExercises(prev => Array.from(new Set([...prev, id])));
-          return;
-        }
-        addExerciseToDraft(id);
       };
 
       const removeSessionExercise = (id) => {

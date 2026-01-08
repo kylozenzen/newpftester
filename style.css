@@ -511,6 +511,18 @@ select:focus-visible {
   color: color-mix(in srgb, var(--text) 90%, var(--muted)) !important;
 }
 
+.workout-shell .text-gray-500 {
+  color: color-mix(in srgb, var(--text) 76%, var(--muted)) !important;
+}
+
+.analytics-shell .text-gray-500 {
+  color: color-mix(in srgb, var(--text) 78%, var(--muted)) !important;
+}
+
+.analytics-shell .text-gray-400 {
+  color: color-mix(in srgb, var(--text) 66%, var(--muted)) !important;
+}
+
 .filter-chip {
   padding: 6px 12px;
   border-radius: 999px;
@@ -544,9 +556,9 @@ select:focus-visible {
 }
 
 .cues-card {
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 16px;
   padding: 16px;
   color: var(--text);
@@ -562,6 +574,12 @@ select:focus-visible {
 
 .cues-accent {
   color: var(--accent);
+}
+
+.plan-card {
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.12);
 }
 
 .inline-message {
