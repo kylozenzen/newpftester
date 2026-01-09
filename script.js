@@ -1563,7 +1563,10 @@ const Home = ({
   suggestedFocus,
   onStartWorkout,
   onGenerate,
-  homeQuote
+  homeQuote,
+  isRestDay,
+  onLogRestDay,
+  onUndoRestDay
 }) => {
   return (
     <div className="flex flex-col h-full bg-gray-50 home-screen">
@@ -1592,36 +1595,52 @@ const Home = ({
               <div className="text-lg font-black text-gray-900">{suggestedFocus}</div>
             </div>
           </div>
-          <button
-            onClick={onStartWorkout}
-            className="home-primary-button"
-          >
-            Start Today
-          </button>
-          <div className="home-quick-generate no-scrollbar">
-            {['Push', 'Pull', 'Legs', 'Full Body', 'Surprise Me'].map(label => (
-              <button
-                key={label}
-                onClick={() => onGenerate(label)}
-                className="quick-chip"
-              >
-                {label}
-              </button>
-            ))}
+          <div className="home-section-card">
+            <div className="home-section-title">Start Today</div>
+            <div className="home-section-subtitle">Draft a calm session in seconds.</div>
+            <button
+              onClick={onStartWorkout}
+              className="home-primary-button"
+            >
+              Start Today
+            </button>
+          </div>
+          <div className="home-section-card">
+            <div className="home-section-title">Quick Generate</div>
+            <div className="home-quick-generate no-scrollbar">
+              {['Push', 'Pull', 'Legs', 'Full Body', 'Surprise Me'].map(label => (
+                <button
+                  key={label}
+                  onClick={() => onGenerate(label)}
+                  className="quick-chip"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {homeQuote && (
-            <div className="quote-block home-quote">
-              <p className="quote-text">“{homeQuote.text}”</p>
-              <p className="quote-meta">— {homeQuote.movie}</p>
+            <div className="home-section-card home-quote">
+              <div className="home-section-title">Quote</div>
+              <div className="quote-block">
+                <p className="quote-text">“{homeQuote.text}”</p>
+                <p className="quote-meta">— {homeQuote.movie}</p>
+              </div>
             </div>
           )}
+          <button
+            onClick={isRestDay ? onUndoRestDay : onLogRestDay}
+            className="home-rest-action"
+          >
+            {isRestDay ? 'Undo Rest Day' : 'Log Rest Day'}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExercises, setPinnedExercises, recentExercises, activeSession, onFinishSession, onStartWorkoutFromBuilder, onAddExerciseFromSearch, onPushMessage, onRemoveSessionExercise, onSwapSessionExercise, onStartEmptySession, isRestDay, restQuote, onLogRestDay, onUndoRestDay, onCancelSession }) => {
+const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExercises, setPinnedExercises, recentExercises, activeSession, onFinishSession, onStartWorkoutFromBuilder, onAddExerciseFromSearch, onPushMessage, onRemoveSessionExercise, onSwapSessionExercise, onStartEmptySession, isRestDay, onCancelSession }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapState, setSwapState] = useState(null);
@@ -1872,7 +1891,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
                 isRestDay ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-200 bg-white text-gray-900'
               }`}
             >
-              {libraryVisible ? 'Close exercises' : 'Browse exercises'}
+              {libraryVisible ? 'Close exercises' : 'Browse full library'}
             </button>
           </div>
           <div className="relative">
@@ -1890,32 +1909,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           {!hasTodayWorkout && !isRestDay && (
             <div className="text-[11px] workout-muted">Create a draft to add exercises and start logging.</div>
           )}
-          {isRestDay ? (
-            <button onClick={onUndoRestDay} className="home-rest-action">
-              Undo Rest Day
-            </button>
-          ) : (
-            <button onClick={onLogRestDay} className="home-rest-action">
-              Log Rest Day
-            </button>
-          )}
         </Card>
-
-        {isRestDay && (
-          <Card className="space-y-3 workout-card">
-            <div>
-              <div className="text-xs font-bold workout-muted uppercase">Rest Day</div>
-              <div className="text-base font-black workout-heading">Rest Day logged</div>
-            </div>
-            <div className="text-sm text-gray-500">Recovery counts. Come back stronger tomorrow.</div>
-            {restQuote && (
-              <div className="quote-block subtle">
-                <p className="quote-text">“{restQuote.text}”</p>
-                <p className="quote-meta">— {restQuote.movie}</p>
-              </div>
-            )}
-          </Card>
-        )}
 
         {searchQuery && hasTodayWorkout && (
           <div ref={searchResultsRef}>
@@ -1946,7 +1940,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
                 <div className="text-[11px] workout-muted">{isSessionMode ? 'Log as you go' : 'Edit and start when ready'}</div>
               </div>
               <button
-                onClick={() => onCancelSession?.(isSessionMode)}
+                onClick={() => onCancelSession?.(isSessionMode, sessionHasLogged)}
                 className="session-cancel-button"
               >
                 {isSessionMode ? 'Cancel workout' : 'Cancel draft'}
@@ -2638,7 +2632,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                             </div>
 
                             <button
-                              onClick={handleQuickAddSet}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleQuickAddSet();
+                              }}
                               disabled={!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet}
                               className={`w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${
                                 (!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
@@ -3261,11 +3260,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
 
     // ========== PROFILE TAB ==========
     const ProfileView = ({ settings, setSettings, onViewAnalytics, onExportData, onImportData, onResetApp, onResetOnboarding }) => {
-      const [workoutOpen, setWorkoutOpen] = useState(true);
+      const [workoutOpen, setWorkoutOpen] = useState(false);
       const [appearanceOpen, setAppearanceOpen] = useState(false);
-      const [analyticsOpen, setAnalyticsOpen] = useState(true);
-      const [learnOpen, setLearnOpen] = useState(true);
-      const [aboutOpen, setAboutOpen] = useState(true);
+      const [analyticsOpen, setAnalyticsOpen] = useState(false);
+      const [learnOpen, setLearnOpen] = useState(false);
+      const [aboutOpen, setAboutOpen] = useState(false);
+      const [dataToolsOpen, setDataToolsOpen] = useState(false);
 
       const accentOptions = [
         { id: 'purple', label: 'Purple', color: '#8B5CF6' },
@@ -3341,66 +3341,10 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
             </Card>
 
             <Card className="space-y-3">
-              <div>
-                <div className="text-xs font-bold text-gray-500 uppercase">Data tools</div>
-                <div className="text-sm text-gray-500">Export, import, and reset</div>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={onExportData}
-                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
-                >
-                  Export Data
-                </button>
-                <button
-                  onClick={onImportData}
-                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
-                >
-                  Import Data
-                </button>
-                <button
-                  onClick={onResetApp}
-                  className="w-full py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 font-bold active:scale-[0.98]"
-                >
-                  Reset App
-                </button>
-                <button
-                  onClick={onResetOnboarding}
-                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
-                >
-                  Reset onboarding
-                </button>
-              </div>
-            </Card>
-
-            <Card className="space-y-3">
-              <button
-                onClick={() => setLearnOpen(prev => !prev)}
-                className="w-full flex items-center justify-between text-left"
-              >
-                <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Learn</div>
-                  <div className="text-sm text-gray-500">Quick hits</div>
-                </div>
-                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${learnOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {learnOpen && (
-                <div className="space-y-2 animate-expand">
-                  {learnItems.map(item => (
-                    <details key={item.title} className="border border-gray-200 rounded-xl p-3 bg-white">
-                      <summary className="text-sm font-bold text-gray-900 cursor-pointer">{item.title}</summary>
-                      <p className="text-sm text-gray-600 mt-2">{item.body}</p>
-                    </details>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card className="space-y-3">
               <button onClick={() => setWorkoutOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
                 <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">Workout</div>
-                  <div className="text-sm text-gray-500">Logging preferences</div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Workout logging preferences</div>
+                  <div className="text-sm text-gray-500">Insights and default views</div>
                 </div>
                 <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${workoutOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -3445,9 +3389,32 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
             </Card>
 
             <Card className="space-y-3">
+              <button
+                onClick={() => setLearnOpen(prev => !prev)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Learn</div>
+                  <div className="text-sm text-gray-500">Quick hits</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${learnOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {learnOpen && (
+                <div className="space-y-2 animate-expand">
+                  {learnItems.map(item => (
+                    <details key={item.title} className="border border-gray-200 rounded-xl p-3 bg-white">
+                      <summary className="text-sm font-bold text-gray-900 cursor-pointer">{item.title}</summary>
+                      <p className="text-sm text-gray-600 mt-2">{item.body}</p>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card className="space-y-3">
               <button onClick={() => setAboutOpen(prev => !prev)} className="w-full flex items-center justify-between text-left">
                 <div>
-                  <div className="text-xs font-bold text-gray-500 uppercase">About Planet Strength</div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">About</div>
                   <div className="text-sm text-gray-500">What this app is for</div>
                 </div>
                 <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${aboutOpen ? 'rotate-180' : ''}`} />
@@ -3467,6 +3434,47 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                       Support the app
                     </a>
                   </div>
+                </div>
+              )}
+            </Card>
+
+            <Card className="space-y-3">
+              <button
+                onClick={() => setDataToolsOpen(prev => !prev)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase">Data tools</div>
+                  <div className="text-sm text-gray-500">Export, import, and reset</div>
+                </div>
+                <Icon name="ChevronDown" className={`w-4 h-4 text-gray-400 transition-transform ${dataToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dataToolsOpen && (
+                <div className="grid grid-cols-1 gap-2 animate-expand">
+                  <button
+                    onClick={onExportData}
+                    className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                  >
+                    Export Data
+                  </button>
+                  <button
+                    onClick={onImportData}
+                    className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                  >
+                    Import Data
+                  </button>
+                  <button
+                    onClick={onResetApp}
+                    className="w-full py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 font-bold active:scale-[0.98]"
+                  >
+                    Reset App
+                  </button>
+                  <button
+                    onClick={onResetOnboarding}
+                    className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                  >
+                    Reset onboarding
+                  </button>
                 </div>
               )}
             </Card>
@@ -4051,7 +4059,6 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
       const restDayDates = Array.isArray(appState?.restDays) ? appState.restDays : [];
       const isRestDay = restDayDates.includes(todayKey);
       const homeQuote = useMemo(() => getDailyQuote(homeQuotes, 'home'), [todayKey]);
-      const restQuote = useMemo(() => getDailyQuote(restDayQuotes, 'rest'), [todayKey]);
       const suggestedFocus = useMemo(() => {
         const muscleGroups = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
         const workoutDays = Object.entries(dayEntries || {})
@@ -4252,7 +4259,7 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
         setPostWorkoutQuote(chosenQuote);
         setShowPostWorkout(true);
         if (postWorkoutTimerRef.current) clearTimeout(postWorkoutTimerRef.current);
-        postWorkoutTimerRef.current = setTimeout(() => setShowPostWorkout(false), 2600);
+        postWorkoutTimerRef.current = setTimeout(() => setShowPostWorkout(false), 3600);
         setTab('home');
         pushMessage('Workout saved.');
       };
@@ -4468,9 +4475,12 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
         });
       };
 
-      const cancelTodaySession = (isActive = false) => {
-        if (isActive) {
-          const confirmed = window.confirm('Cancel this workout? Your logged sets will be cleared.');
+      const cancelTodaySession = (isActive = false, hasLoggedSets = false) => {
+        if (hasLoggedSets) {
+          const confirmed = window.confirm('Discard today’s session? Your logged sets will be cleared.');
+          if (!confirmed) return;
+        } else if (isActive) {
+          const confirmed = window.confirm('Cancel this workout?');
           if (!confirmed) return;
         }
         setActiveSession(null);
@@ -4940,6 +4950,9 @@ return (
                         triggerGenerator(map[label] || 'surprise');
                       }}
                       homeQuote={homeQuote}
+                      isRestDay={isRestDay}
+                      onLogRestDay={logRestDay}
+                      onUndoRestDay={undoRestDay}
                     />
                   )}
                   {tab === 'workout' && (
@@ -4960,9 +4973,6 @@ return (
                       onSwapSessionExercise={swapSessionExercise}
                       onStartEmptySession={startEmptySession}
                       isRestDay={isRestDay}
-                      restQuote={restQuote}
-                      onLogRestDay={logRestDay}
-                      onUndoRestDay={undoRestDay}
                       onCancelSession={cancelTodaySession}
                     />
                   )}
