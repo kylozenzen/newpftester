@@ -2368,7 +2368,9 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
           if (!savedRef.current) {
             const payload = buildSessionPayload(latestDraftRef.current);
             if (payload && onSaveRef.current) {
-              onSaveRef.current(id, payload);
+              // Pass keepOpen: true to prevent closing modal during auto-save cleanup
+              // The modal will be closed by onClose() separately if user initiated close
+              onSaveRef.current(id, payload, { quiet: true, keepOpen: true });
               savedRef.current = true;
             }
           }
@@ -4613,7 +4615,10 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
           kind: 'strength'
         }, normalizedSession.sets || []);
 
-        setActiveEquipment(null);
+        // Only close modal if not explicitly told to keep it open (e.g., from cleanup/auto-save)
+        if (!options.keepOpen) {
+          setActiveEquipment(null);
+        }
         if (!options.quiet) {
           if (settings.insightsEnabled !== false && lastSession && newMaxWeight !== null) {
             const improved = newMaxWeight > (lastMaxWeight || 0) || (newMaxWeight === lastMaxWeight && newTotalReps > (lastTotalReps || 0));
