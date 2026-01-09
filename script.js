@@ -236,28 +236,28 @@ const { useState, useEffect, useMemo, useRef } = React;
     // ========== CONSTANTS ==========
     const AVATARS = ["🦁","🦍","🦖","💪","🏃","🧘","🤖","👽","🦊","⚡"];
 
-    const HOME_QUOTES = [
-      { quote: "It’s not about being the best. It’s about being better than you were yesterday.", movie: "Creed" },
-      { quote: "We choose to go to the moon in this decade and do the other things.", movie: "First Man" },
-      { quote: "I’m just one stomach flu away from my goal weight.", movie: "The Devil Wears Prada" },
-      { quote: "Sometimes to do what’s right we have to give up the thing we want most.", movie: "Spider-Man 2" },
-      { quote: "It’s the simple things. The small steps.", movie: "Little Women" }
+    const homeQuotes = [
+      { text: "It’s not about being the best. It’s about being better than you were yesterday.", movie: "Creed" },
+      { text: "Sometimes to do what’s right we have to give up the thing we want most.", movie: "Spider-Man 2" },
+      { text: "It’s the simple things. The small steps.", movie: "Little Women" },
+      { text: "Great men are not born great, they grow great.", movie: "The Godfather" },
+      { text: "You’re capable of more than you know.", movie: "A League of Their Own" }
     ];
 
-    const POST_WORKOUT_QUOTES = [
-      { quote: "You are what you choose to be.", movie: "The Iron Giant" },
-      { quote: "Success is peace of mind.", movie: "Coach Carter" },
-      { quote: "Every moment is a fresh beginning.", movie: "The Secret Life of Walter Mitty" },
-      { quote: "Greatness is what you do with the hand you’re dealt.", movie: "The Pursuit of Happyness" },
-      { quote: "You did good.", movie: "Good Will Hunting" }
+    const postWorkoutQuotes = [
+      { text: "You are what you choose to be.", movie: "The Iron Giant" },
+      { text: "Success is peace of mind.", movie: "Coach Carter" },
+      { text: "Every moment is a fresh beginning.", movie: "The Secret Life of Walter Mitty" },
+      { text: "Greatness is what you do with the hand you’re dealt.", movie: "The Pursuit of Happyness" },
+      { text: "You did good.", movie: "Good Will Hunting" }
     ];
 
-    const REST_DAY_QUOTES = [
-      { quote: "There’s a time for daring and there’s a time for caution.", movie: "Dead Poets Society" },
-      { quote: "You’re gonna need a bigger boat.", movie: "Jaws" },
-      { quote: "The best way to predict the future is to invent it.", movie: "Back to the Future" },
-      { quote: "Stay, and help me set a new table.", movie: "Chef" },
-      { quote: "This is the beginning of a beautiful friendship.", movie: "Casablanca" }
+    const restDayQuotes = [
+      { text: "There’s a time for daring and there’s a time for caution.", movie: "Dead Poets Society" },
+      { text: "Stay, and help me set a new table.", movie: "Chef" },
+      { text: "The best way to predict the future is to invent it.", movie: "Back to the Future" },
+      { text: "This is the beginning of a beautiful friendship.", movie: "Casablanca" },
+      { text: "We are who we choose to be. Now choose.", movie: "Spider-Man" }
     ];
 
     const GYM_TYPES = {
@@ -929,6 +929,7 @@ const motivationalQuotes = [
     const ACTIVE_SESSION_KEY = 'ps_active_session';
     const DRAFT_SESSION_KEY = 'ps_draft_session';
     const TODAY_WORKOUT_KEY = 'ps_today_workout';
+    const REST_DAY_KEY = 'restDayDates';
     const LAST_OPEN_KEY = 'ps_last_open';
 
     const uniqueDayKeysFromHistory = (history, cardioHistory = {}, restDays = [], dayEntries = null) => {
@@ -1466,6 +1467,8 @@ const Home = ({
   onGenerate,
   onViewAnalytics,
   onPlanTomorrow,
+  onLogRestDay,
+  onUndoRestDay,
   homeQuote,
   restQuote,
   isRestDay
@@ -1473,12 +1476,13 @@ const Home = ({
   return (
     <div className="flex flex-col h-full bg-gray-50 home-screen">
       <div className="bg-white border-b border-gray-100 sticky top-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="p-4 py-5 flex items-center justify-between">
+        <div className="px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-xs text-gray-400 font-bold uppercase tracking-wide">Planet Strength</div>
-            <h1 className="text-2xl font-black text-gray-900">Welcome back, {profile.username || 'Athlete'}</h1>
+            <div className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">PLANET STRENGTH</div>
+            <h1 className="text-xl font-black text-gray-900">Welcome back, {profile.username || 'Athlete'}</h1>
+            <div className="text-xs text-gray-500 font-semibold mt-1">Keep it simple today.</div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl border border-purple-200">
+          <div className="w-11 h-11 rounded-2xl bg-purple-50 flex items-center justify-center text-xl border border-purple-200">
             {profile.avatar}
           </div>
         </div>
@@ -1493,10 +1497,13 @@ const Home = ({
               <p className="text-sm text-gray-500">Recovery helps you come back stronger.</p>
               {restQuote && (
                 <div className="quote-block">
-                  <p className="quote-text">“{restQuote.quote}”</p>
+                  <p className="quote-text">“{restQuote.text}”</p>
                   <p className="quote-meta">— {restQuote.movie}</p>
                 </div>
               )}
+              <button onClick={onUndoRestDay} className="home-rest-action">
+                Undo Rest Day
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={onViewAnalytics} className="home-secondary-button">
@@ -1512,7 +1519,6 @@ const Home = ({
           </div>
         ) : (
           <div className="home-stack">
-            <div className="text-sm text-gray-500 font-semibold">Keep it simple today.</div>
             <div className="home-card-row">
               <div className="home-mini-card">
                 <div className="text-xs uppercase text-gray-400 font-bold">Last workout</div>
@@ -1540,9 +1546,12 @@ const Home = ({
                 </button>
               ))}
             </div>
+            <button onClick={onLogRestDay} className="home-rest-action">
+              Log Rest Day
+            </button>
             {homeQuote && (
-              <div className="quote-block subtle">
-                <p className="quote-text">“{homeQuote.quote}”</p>
+              <div className="quote-block home-quote">
+                <p className="quote-text">“{homeQuote.text}”</p>
                 <p className="quote-meta">— {homeQuote.movie}</p>
               </div>
             )}
@@ -1876,14 +1885,15 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300"
             />
           </div>
-          {!libraryVisible && showStartPrompt && !isRestDay && (
-            <button
-              onClick={() => setLibraryVisible(true)}
-              className="mt-2 text-xs font-bold text-purple-700 underline"
-            >
-              Browse full library
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setLibraryVisible(true);
+              setActiveFilter('All');
+            }}
+            className="browse-library-button"
+          >
+            Browse full library
+          </button>
         </div>
       </div>
 
@@ -1897,7 +1907,7 @@ const Workout = ({ profile, history, onSelectExercise, onOpenCardio, settings, s
             <div className="text-sm text-gray-500">Recovery helps you come back stronger.</div>
             {restQuote && (
               <div className="quote-block subtle">
-                <p className="quote-text">“{restQuote.quote}”</p>
+                <p className="quote-text">“{restQuote.text}”</p>
                 <p className="quote-meta">— {restQuote.movie}</p>
               </div>
             )}
@@ -3271,7 +3281,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
     };
 
     // ========== PROFILE TAB ==========
-    const ProfileView = ({ settings, setSettings, onViewAnalytics }) => {
+    const ProfileView = ({ settings, setSettings, onViewAnalytics, onExportData, onImportData, onResetApp, onResetOnboarding }) => {
       const [workoutOpen, setWorkoutOpen] = useState(true);
       const [appearanceOpen, setAppearanceOpen] = useState(false);
       const [analyticsOpen, setAnalyticsOpen] = useState(true);
@@ -3397,6 +3407,39 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                   </button>
                 </div>
               )}
+            </Card>
+
+            <Card className="space-y-3">
+              <div>
+                <div className="text-xs font-bold text-gray-500 uppercase">Data tools</div>
+                <div className="text-sm text-gray-500">Export, import, and reset</div>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={onExportData}
+                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                >
+                  Export Data
+                </button>
+                <button
+                  onClick={onImportData}
+                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                >
+                  Import Data
+                </button>
+                <button
+                  onClick={onResetApp}
+                  className="w-full py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 font-bold active:scale-[0.98]"
+                >
+                  Reset App
+                </button>
+                <button
+                  onClick={onResetOnboarding}
+                  className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-bold active:scale-[0.98]"
+                >
+                  Reset onboarding
+                </button>
+              </div>
             </Card>
 
             <Card className="space-y-3">
@@ -3738,11 +3781,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const savedHistory = storage.get('ps_v2_history', {});
         const savedCardio = storage.get('ps_v2_cardio', {});
         const savedState = storage.get('ps_v2_state', { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] });
+        const savedRestDays = storage.get(REST_DAY_KEY, []);
         const savedDismiss = storage.get('ps_dismissed_draft_date', null);
         const savedTodayWorkout = storage.get(TODAY_WORKOUT_KEY, null);
         const savedActiveSession = storage.get(ACTIVE_SESSION_KEY, null);
         const normalizedActiveSession = normalizeActiveSession(savedTodayWorkout || savedActiveSession);
         const currentDayKey = toDayKey(new Date());
+        const mergedRestDays = Array.from(new Set([...(savedState?.restDays || []), ...(savedRestDays || [])]));
         
         const migratedProfile = {
           username: '',
@@ -3763,7 +3808,8 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setSettings({ ...settingsDefaults, ...savedSettings });
         setHistory(savedHistory);
         setCardioHistory(savedCardio);
-        setAppState(savedState);
+        setAppState({ ...savedState, restDays: mergedRestDays });
+        storage.set(REST_DAY_KEY, mergedRestDays);
         setDismissedDraftDate(savedDismiss);
         setActiveSession(normalizedActiveSession?.date === currentDayKey ? normalizedActiveSession : null);
         setDraftPlan(null);
@@ -3826,7 +3872,11 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         const timeoutId = setTimeout(persist, 0);
         return () => clearTimeout(timeoutId);
       }, [cardioHistory, loaded]);
-      useEffect(() => { if(loaded) storage.set('ps_v2_state', appState); }, [appState, loaded]);
+      useEffect(() => {
+        if (!loaded) return;
+        storage.set('ps_v2_state', appState);
+        storage.set(REST_DAY_KEY, appState?.restDays || []);
+      }, [appState, loaded]);
       useEffect(() => { if(loaded) storage.set('ps_dismissed_draft_date', dismissedDraftDate); }, [dismissedDraftDate, loaded]);
       useEffect(() => {
         if (!loaded) return;
@@ -4007,13 +4057,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
       };
 
       const todayKey = toDayKey(new Date());
-      const hasWorkoutToday = dayEntries?.[todayKey]?.type === 'workout';
       const activeSessionToday = activeSession?.date === todayKey ? activeSession : null;
+      const hasWorkoutToday = !!activeSessionToday;
       const draftPlanToday = draftPlan?.date === todayKey ? draftPlan : null;
-      const lastWorkoutHoursAgo = lastWorkoutDate ? (Date.now() - lastWorkoutDate.getTime()) / 36e5 : null;
-      const isRestDay = !activeSessionToday && lastWorkoutHoursAgo !== null && lastWorkoutHoursAgo <= 36;
-      const homeQuote = useMemo(() => getDailyQuote(HOME_QUOTES, 'home'), [todayKey]);
-      const restQuote = useMemo(() => getDailyQuote(REST_DAY_QUOTES, 'rest'), [todayKey]);
+      const restDayDates = Array.isArray(appState?.restDays) ? appState.restDays : [];
+      const isRestDay = restDayDates.includes(todayKey);
+      const homeQuote = useMemo(() => getDailyQuote(homeQuotes, 'home'), [todayKey]);
+      const restQuote = useMemo(() => getDailyQuote(restDayQuotes, 'rest'), [todayKey]);
       const suggestedFocus = useMemo(() => {
         const muscleGroups = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
         const workoutDays = Object.entries(dayEntries || {})
@@ -4036,6 +4086,9 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         if (!isRestDay) return;
         setActiveEquipment(null);
         setActiveCardio(null);
+        setActiveSession(null);
+        setDraftPlan(null);
+        setDismissedDraftDate(null);
       }, [isRestDay]);
       const createEmptySession = (overrides = {}) => ({
         date: todayKey,
@@ -4176,6 +4229,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 
       const createEmptyDraft = () => {
         createDraft({ label: 'Workout Draft', exercises: [], createdFrom: 'manual', type: todayWorkoutType });
+        updateSessionItemsByIds([], { status: 'draft', createdFrom: 'manual' });
         setFocusDraft(true);
       };
 
@@ -4200,7 +4254,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         setActiveEquipment(null);
         setActiveCardio(null);
         setSessionStartNotice(null);
-        const chosenQuote = getRandomQuote(POST_WORKOUT_QUOTES);
+        const chosenQuote = getRandomQuote(postWorkoutQuotes);
         setPostWorkoutQuote(chosenQuote);
         setShowPostWorkout(true);
         if (postWorkoutTimerRef.current) clearTimeout(postWorkoutTimerRef.current);
@@ -4275,6 +4329,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
         }
         const chosen = type === 'surprise' ? ['legs','push','pull','full'][Math.floor(Math.random()*4)] : type;
         const draft = buildDraftPlan(chosen, generatorOptions || {});
+        createDraft({ ...draft, createdFrom: 'generated' });
         updateSessionItemsByIds(draft.exercises || [], { status: 'draft', createdFrom: 'generated' });
         setTab('workout');
       };
@@ -4354,6 +4409,29 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
             createdFrom: 'manual'
           });
         }
+      };
+
+      const logRestDay = () => {
+        setAppState(prev => {
+          const restDays = new Set(prev?.restDays || []);
+          restDays.add(todayKey);
+          return { ...(prev || {}), restDays: Array.from(restDays) };
+        });
+        setActiveSession(null);
+        setDraftPlan(null);
+        setDismissedDraftDate(null);
+        setActiveEquipment(null);
+        setActiveCardio(null);
+        setTab('home');
+        pushMessage('Rest day logged.');
+      };
+
+      const undoRestDay = () => {
+        setAppState(prev => {
+          const restDays = (prev?.restDays || []).filter(day => day !== todayKey);
+          return { ...(prev || {}), restDays };
+        });
+        pushMessage('Rest day removed.');
       };
 
       const startWorkoutFromBuilder = () => {
@@ -4590,6 +4668,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           storage.set(ACTIVE_SESSION_KEY, null);
           storage.set(DRAFT_SESSION_KEY, null);
           storage.set(TODAY_WORKOUT_KEY, null);
+          storage.set(REST_DAY_KEY, []);
         }
       };
 
@@ -4621,6 +4700,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
             history,
             cardioHistory,
             appState,
+            restDayDates: appState?.restDays || [],
             meta: {
               version: STORAGE_VERSION,
               pinnedExercises,
@@ -4661,9 +4741,15 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
           reader.onload = (event) => {
             try {
               const importedData = JSON.parse(event.target.result);
+              const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
               // Validate the imported data
-              if (!importedData.profile || !importedData.settings) {
+              if (!isPlainObject(importedData)
+                || !isPlainObject(importedData.profile)
+                || !isPlainObject(importedData.settings)
+                || !isPlainObject(importedData.history)
+                || !isPlainObject(importedData.cardioHistory)
+              ) {
                 alert('❌ Invalid backup file format.');
                 return;
               }
@@ -4686,9 +4772,23 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
                   setCardioHistory(importedData.cardioHistory);
                   storage.set('ps_v2_cardio', importedData.cardioHistory);
                 }
-                if (importedData.appState) {
-                  setAppState(importedData.appState);
-                  storage.set('ps_v2_state', importedData.appState);
+                if (importedData.appState || importedData.restDayDates) {
+                  const restDays = Array.isArray(importedData?.restDayDates)
+                    ? importedData.restDayDates
+                    : (Array.isArray(importedData?.appState?.restDays) ? importedData.appState.restDays : []);
+                  const nextAppState = {
+                    lastWorkoutType: importedData.appState?.lastWorkoutType || null,
+                    lastWorkoutDayKey: importedData.appState?.lastWorkoutDayKey || null,
+                    restDays
+                  };
+                  setAppState(nextAppState);
+                  storage.set('ps_v2_state', nextAppState);
+                  storage.set(REST_DAY_KEY, restDays);
+                } else {
+                  const nextAppState = { lastWorkoutType: null, lastWorkoutDayKey: null, restDays: [] };
+                  setAppState(nextAppState);
+                  storage.set('ps_v2_state', nextAppState);
+                  storage.set(REST_DAY_KEY, []);
                 }
                 if (importedData.meta) {
                   const meta = {
@@ -4711,7 +4811,13 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
                     pinnedExercises: importedData.settings?.pinnedExercises || [],
                     recentExercises: deriveRecentExercises(importedData.history || {}),
                     exerciseUsageCounts: deriveUsageCountsFromHistory(importedData.history || {}),
-                    dayEntries: buildDayEntriesFromHistory(importedData.history || {}, importedData.cardioHistory || {}, importedData.appState?.restDays || []),
+                    dayEntries: buildDayEntriesFromHistory(
+                      importedData.history || {},
+                      importedData.cardioHistory || {},
+                      Array.isArray(importedData?.restDayDates)
+                        ? importedData.restDayDates
+                        : (importedData.appState?.restDays || [])
+                    ),
                     lastExerciseStats: {}
                   };
                   setPinnedExercises(derivedMeta.pinnedExercises);
@@ -4740,7 +4846,7 @@ const CardioLogger = ({ type, onSave, onClose, lastSession, insightsEnabled }) =
 return (
         <>
           <InstallPrompt />
-          <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+          <div className="app-root bg-gray-50 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <InlineMessage message={inlineMessage} />
               <Toast message={toastMessage} />
@@ -4751,7 +4857,7 @@ return (
                     <div className="text-2xl font-black text-gray-900">Workout saved.</div>
                     {postWorkoutQuote && (
                       <div className="quote-block subtle">
-                        <p className="quote-text">“{postWorkoutQuote.quote}”</p>
+                        <p className="quote-text">“{postWorkoutQuote.text}”</p>
                         <p className="quote-meta">— {postWorkoutQuote.movie}</p>
                       </div>
                     )}
@@ -4798,6 +4904,8 @@ return (
                       }}
                       onViewAnalytics={() => setShowAnalytics(true)}
                       onPlanTomorrow={() => setTab('workout')}
+                      onLogRestDay={logRestDay}
+                      onUndoRestDay={undoRestDay}
                       homeQuote={homeQuote}
                       restQuote={restQuote}
                       isRestDay={isRestDay}
@@ -4848,6 +4956,10 @@ return (
                       settings={settings}
                       setSettings={setSettings}
                       onViewAnalytics={() => setShowAnalytics(true)}
+                      onExportData={handleExportData}
+                      onImportData={handleImportData}
+                      onResetApp={handleReset}
+                      onResetOnboarding={handleResetOnboarding}
                     />
                   )}
                 </>
