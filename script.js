@@ -1952,7 +1952,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           </Card>
         )}
 
-        {!isRestDay && (libraryVisible || searchQuery || filteredPinned.length > 0) && (
+        {!isRestDay && !isSessionMode && (isDraft || libraryVisible || searchQuery) && (
         <Card className="space-y-2 workout-card">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold workout-muted uppercase">Pinned Exercises</div>
@@ -2183,6 +2183,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
       const lastSetSubmitRef = useRef({ key: '', at: 0 });
       const weightInputRef = useRef(null);
       const repsInputRef = useRef(null);
+      const onSaveRef = useRef(onSave);
 
       const best = useMemo(() => getBestForEquipment(sessions), [sessions]);
       const nextTarget = useMemo(() => getNextTarget(profile, id, best), [profile, id, best]);
@@ -2356,17 +2357,23 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
         latestDraftRef.current = { loggedSets, anchorWeight, anchorReps, anchorAdjusted, note };
       }, [loggedSets, anchorWeight, anchorReps, anchorAdjusted, note]);
 
+      // Keep onSaveRef in sync with latest onSave prop
+      useEffect(() => {
+        onSaveRef.current = onSave;
+      }, [onSave]);
+
+      // Cleanup effect - only runs on unmount, uses refs to avoid stale closures
       useEffect(() => {
         return () => {
           if (!savedRef.current) {
             const payload = buildSessionPayload(latestDraftRef.current);
-            if (payload) {
-              onSave(id, payload);
+            if (payload && onSaveRef.current) {
+              onSaveRef.current(id, payload);
               savedRef.current = true;
             }
           }
         };
-      }, [id, onSave]);
+      }, [id]);
 
       const handleClose = () => {
         handleSaveSession();
@@ -2563,6 +2570,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                                     inputMode="numeric"
                                     value={setInputs.weight}
                                     onChange={(e) => setSetInputs(prev => ({ ...prev, weight: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        repsInputRef.current?.focus();
+                                      }
+                                    }}
                                     placeholder="Weight"
                                     ref={weightInputRef}
                                     className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
@@ -2572,6 +2585,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                                     inputMode="numeric"
                                     value={setInputs.reps}
                                     onChange={(e) => setSetInputs(prev => ({ ...prev, reps: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleQuickAddSet();
+                                      }
+                                    }}
                                     placeholder="Reps"
                                     ref={repsInputRef}
                                     className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
@@ -2633,6 +2652,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                                               inputMode="numeric"
                                               value={editValues.weight}
                                               onChange={(e) => setEditValues(prev => ({ ...prev, weight: e.target.value }))}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  saveEditedSet();
+                                                }
+                                              }}
                                               className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
                                             />
                                             <input
@@ -2640,6 +2665,12 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                                               inputMode="numeric"
                                               value={editValues.reps}
                                               onChange={(e) => setEditValues(prev => ({ ...prev, reps: e.target.value }))}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  saveEditedSet();
+                                                }
+                                              }}
                                               className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
                                             />
                                             <button
