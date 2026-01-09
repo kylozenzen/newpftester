@@ -126,15 +126,18 @@ body.app-shell {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 12px 16px calc(92px + env(safe-area-inset-bottom)) !important;
+  padding: 14px 16px calc(86px + env(safe-area-inset-bottom)) !important;
+  gap: 14px;
+  justify-content: space-between;
+  min-height: 0;
 }
 
 .home-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
-  justify-content: flex-start;
+  justify-content: space-between;
 }
 
 .home-card-row {
@@ -144,7 +147,7 @@ body.app-shell {
 }
 
 .home-mini-card {
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -153,7 +156,7 @@ body.app-shell {
 
 .home-primary-button {
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-radius: 18px;
   background: var(--accent);
   color: #fff;
@@ -179,20 +182,20 @@ body.app-shell {
 
 .home-quick-generate {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: 6px;
 }
 
 .quick-chip {
   white-space: nowrap;
-  padding: 12px 18px;
-  min-height: 48px;
-  min-width: 112px;
+  padding: 14px 22px;
+  min-height: 54px;
+  min-width: 150px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text);
 }
@@ -217,9 +220,10 @@ body.app-shell {
 }
 
 .home-quote .quote-text {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.35;
 }
 
 .home-quote .quote-meta {
@@ -261,12 +265,13 @@ body.app-shell {
 .post-workout-screen {
   position: absolute;
   inset: 0;
-  background: rgba(15, 17, 23, 0.12);
+  background: rgba(15, 17, 23, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
-  pointer-events: none;
+  pointer-events: auto;
+  padding: 20px;
 }
 
 .post-workout-card {
@@ -277,6 +282,25 @@ body.app-shell {
   max-width: 320px;
   text-align: left;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.12);
+}
+
+.post-workout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.post-workout-close {
+  border: none;
+  background: var(--surface-2);
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .exercise-history-grid {
@@ -359,6 +383,11 @@ select:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-color: var(--accent) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -774,6 +803,27 @@ select:focus-visible {
   background: var(--surface);
   border-color: var(--border);
   color: var(--text);
+}
+
+.session-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+}
+
+.session-cancel-button {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 999px;
 }
 
 .workout-shell .workout-chip {
