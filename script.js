@@ -1,4 +1,4 @@
-const { useState, useEffect, useMemo, useRef } = React;
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
     const FEEDBACK_EMAIL = 'hello@planetstrength.app';
     const FOLLOW_URL = 'https://example.com/planet-strength';
@@ -125,6 +125,52 @@ const { useState, useEffect, useMemo, useRef } = React;
       );
     };
 
+
+    // ========== ERROR BOUNDARY ==========
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error('Planet Strength Error:', error, errorInfo);
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm w-full text-center space-y-4">
+                <div className="text-4xl">😅</div>
+                <h2 className="text-xl font-bold text-gray-900">Something went wrong</h2>
+                <p className="text-sm text-gray-600">
+                  Don't worry, your workout data is safe. Try reloading the app.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-3 bg-purple-600 text-white font-bold rounded-xl active:scale-95 transition-transform"
+                >
+                  Reload App
+                </button>
+                <button
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                  className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-95 transition-transform"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        return this.props.children;
+      }
+    }
 
     // ========== ICONS ==========
     const Icon = ({ name, className }) => {
@@ -935,6 +981,18 @@ const motivationalQuotes = [
     // ========== UTILITIES ==========
     const clampTo5 = (n) => Math.max(10, Math.round(n / 5) * 5);
 
+    // Custom hook for debouncing values
+    const useDebounce = (value, delay = 200) => {
+      const [debouncedValue, setDebouncedValue] = useState(value);
+      
+      useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+      }, [value, delay]);
+      
+      return debouncedValue;
+    };
+
     const toDayKey = (date = new Date()) => {
       const y = date.getFullYear();
       const m = String(date.getMonth()+1).padStart(2,'0');
@@ -1567,6 +1625,7 @@ const Home = ({
 
 const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExercises, setPinnedExercises, recentExercises, activeSession, onFinishSession, onStartWorkoutFromBuilder, onAddExerciseFromSearch, onPushMessage, onRemoveSessionExercise, onSwapSessionExercise, onStartEmptySession, isRestDay, onCancelSession }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 200);
   const [libraryVisible, setLibraryVisible] = useState(settings.showAllExercises);
   const [swapState, setSwapState] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -1636,11 +1695,12 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
     return availableEquipment.filter(id => resolveGroup(EQUIPMENT_DB[id]) === activeFilter);
   }, [activeFilter, availableEquipment, filteredPinned]);
 
+  // Use debounced query for search results (better performance)
   const searchResults = useMemo(() => {
     const pool = filteredPool;
-    if (!searchQuery.trim()) return [];
-    return fuzzyMatchExercises(searchQuery, pool);
-  }, [searchQuery, filteredPool]);
+    if (!debouncedSearchQuery.trim()) return [];
+    return fuzzyMatchExercises(debouncedSearchQuery, pool);
+  }, [debouncedSearchQuery, filteredPool]);
 
   const togglePin = (id) => {
     if (EQUIPMENT_DB[id]?.comingSoon) return;
@@ -1656,11 +1716,11 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
 
 
   useEffect(() => {
-    if (!searchQuery.trim() || !searchResultsRef.current) return;
+    if (!debouncedSearchQuery.trim() || !searchResultsRef.current) return;
     requestAnimationFrame(() => {
       searchResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  }, [searchQuery, searchResults.length]);
+  }, [debouncedSearchQuery, searchResults.length]);
 
   useEffect(() => {
     const prevStatus = lastSessionStatusRef.current;
@@ -2284,7 +2344,7 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
           syncSessionSets(next);
           return next;
         });
-        setSetInputs({ weight: '', reps: '' });
+        setSetInputs({ weight: anchorWeight || '', reps: anchorReps || '' });
         requestAnimationFrame(() => {
           (weightInputRef.current || repsInputRef.current)?.focus();
         });
