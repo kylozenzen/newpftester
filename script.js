@@ -404,101 +404,23 @@ const motivationalQuotes = [
 
     const EQUIPMENT_DB = {
       // ========== CARDIO ==========
-      "cardio_walk": {
+      "cardio_running": {
         type: 'cardio',
-        name: "Walking",
+        name: "Running",
         target: "Cardio",
         tags: ["Cardio", "Full Body"],
         cardioGroup: "running",
-        emoji: "🚶"
+        emoji: "🏃",
+        comingSoon: true
       },
-      "cardio_outdoor_walk": {
+      "cardio_swimming": {
         type: 'cardio',
-        name: "Outdoor Walk",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "🌤️"
-      },
-      "cardio_outdoor_run": {
-        type: 'cardio',
-        name: "Outdoor Run",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "🏃"
-      },
-      "cardio_treadmill_walk": {
-        type: 'cardio',
-        name: "Treadmill Walk",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "🏃‍♀️"
-      },
-      "cardio_treadmill_run": {
-        type: 'cardio',
-        name: "Treadmill Run",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "🏃‍♂️"
-      },
-      "cardio_incline_walk": {
-        type: 'cardio',
-        name: "Incline Walk",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "⛰️"
-      },
-      "cardio_intervals": {
-        type: 'cardio',
-        name: "Intervals",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "⚡"
-      },
-      "cardio_jog": {
-        type: 'cardio',
-        name: "Jog",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "running",
-        emoji: "🏃‍♀️"
-      },
-      "cardio_swim_laps": {
-        type: 'cardio',
-        name: "Swim Laps",
+        name: "Swimming",
         target: "Cardio",
         tags: ["Cardio", "Full Body"],
         cardioGroup: "swimming",
-        emoji: "🏊"
-      },
-      "cardio_easy_swim": {
-        type: 'cardio',
-        name: "Easy Swim",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "swimming",
-        emoji: "🏊‍♀️"
-      },
-      "cardio_swim_intervals": {
-        type: 'cardio',
-        name: "Swim Intervals",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "swimming",
-        emoji: "🌊"
-      },
-      "cardio_kickboard": {
-        type: 'cardio',
-        name: "Kickboard",
-        target: "Cardio",
-        tags: ["Cardio", "Full Body"],
-        cardioGroup: "swimming",
-        emoji: "🦵"
+        emoji: "🏊",
+        comingSoon: true
       },
       // ========== MACHINES ==========
       "chest_press": { 
@@ -1575,7 +1497,7 @@ const Home = ({
           <div>
             <div className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">PLANET STRENGTH</div>
             <h1 className="text-xl font-black text-gray-900">Welcome back, {profile.username || 'Athlete'}</h1>
-            <div className="text-xs text-gray-500 font-semibold mt-1">A calm session, on your terms.</div>
+            <div className="text-xs text-gray-500 font-semibold mt-1">A session on your terms.</div>
           </div>
           <div className="w-11 h-11 rounded-2xl bg-purple-50 flex items-center justify-center text-xl border border-purple-200">
             {profile.avatar}
@@ -1624,7 +1546,7 @@ const Home = ({
           </div>
           {homeQuote && (
             <div className="home-section-card home-quote">
-              <div className="home-section-title">Quote</div>
+              <div className="home-section-title">Inspiration</div>
               <div className="quote-block">
                 <p className="quote-text">“{homeQuote.text}”</p>
                 <p className="quote-meta">— {homeQuote.movie}</p>
@@ -1721,6 +1643,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
   }, [searchQuery, filteredPool]);
 
   const togglePin = (id) => {
+    if (EQUIPMENT_DB[id]?.comingSoon) return;
     const exists = pinnedExercises.includes(id);
     const updated = exists ? pinnedExercises.filter(x => x !== id) : [...pinnedExercises, id];
     setPinnedExercises(updated);
@@ -1762,7 +1685,8 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
   const renderExerciseRow = (id, actionLabel = 'Add', onAction) => {
     const eq = EQUIPMENT_DB[id];
     if (!eq) return null;
-    const allowAdd = hasTodayWorkout && !isRestDay;
+    const isComingSoon = !!eq.comingSoon;
+    const allowAdd = hasTodayWorkout && !isRestDay && !isComingSoon;
     return (
       <div
         key={id}
@@ -1775,12 +1699,18 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           <div>
             <div className="font-bold workout-heading text-sm leading-tight">{eq.name}</div>
             <div className="text-xs workout-muted">{eq.type === 'cardio' ? 'Cardio' : eq.target}</div>
+            {isComingSoon && (
+              <div className="text-[11px] text-gray-400 font-semibold">Coming Soon</div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); togglePin(id); }}
-            className={`px-2 py-1 rounded-full text-xs font-bold ${pinnedExercises.includes(id) ? 'workout-chip' : 'bg-gray-100 text-gray-500'}`}
+            disabled={isComingSoon}
+            className={`px-2 py-1 rounded-full text-xs font-bold ${pinnedExercises.includes(id) ? 'workout-chip' : 'bg-gray-100 text-gray-500'} ${
+              isComingSoon ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             {pinnedExercises.includes(id) ? 'Pinned' : 'Pin'}
           </button>
@@ -1802,7 +1732,8 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
     if (!eq) return null;
     const pinned = pinnedExercises.includes(id);
     const typeIcon = getExerciseIcon(eq);
-    const allowAdd = hasTodayWorkout && !isRestDay;
+    const isComingSoon = !!eq.comingSoon;
+    const allowAdd = hasTodayWorkout && !isRestDay && !isComingSoon;
     return (
       <div key={id} className="tile text-left">
         <div className="flex items-center justify-between mb-1">
@@ -1810,10 +1741,14 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           <span className="text-[11px] workout-muted">{eq.type === 'cardio' ? 'Cardio' : eq.target}</span>
         </div>
         <div className="font-bold workout-heading text-sm leading-tight">{eq.name}</div>
+        {isComingSoon && (
+          <div className="text-[11px] text-gray-400 font-semibold mt-1">Coming Soon</div>
+        )}
         <div className="tile-actions">
           <button
             onClick={() => togglePin(id)}
-            className={`tile-action ${pinned ? 'workout-chip' : ''}`}
+            disabled={isComingSoon}
+            className={`tile-action ${pinned ? 'workout-chip' : ''} ${isComingSoon ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {pinned ? 'Pinned' : 'Pin'}
           </button>
@@ -1842,6 +1777,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
 
   const handleSearchAdd = (id) => {
     if (!id) return;
+    if (!hasTodayWorkout) return;
     const alreadyAdded = sessionEntries.some(entry => (entry.exerciseId || entry.id) === id);
     if (alreadyAdded) {
       onPushMessage?.('Already added');
@@ -1903,8 +1839,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => { if (!hasTodayWorkout) onStartEmptySession?.(); }}
-              placeholder={hasTodayWorkout ? 'Search exercises...' : 'Start today to search'}
+              placeholder="Search exercises..."
               ref={searchInputRef}
               disabled={isRestDay}
               className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:text-gray-400"
@@ -1915,7 +1850,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           )}
         </Card>
 
-        {searchQuery && hasTodayWorkout && (
+        {searchQuery && (
           <div ref={searchResultsRef}>
             <Card className="space-y-2 workout-card">
               <div className="text-xs font-bold workout-muted uppercase">Search Results</div>
@@ -2017,7 +1952,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           </Card>
         )}
 
-        {!isRestDay && hasTodayWorkout && (libraryVisible || searchQuery || filteredPinned.length > 0) && (
+        {!isRestDay && (libraryVisible || searchQuery || filteredPinned.length > 0) && (
         <Card className="space-y-2 workout-card">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold workout-muted uppercase">Pinned Exercises</div>
@@ -2033,7 +1968,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
         </Card>
         )}
 
-        {!isRestDay && filteredRecents.length > 0 && hasTodayWorkout && (
+        {!isRestDay && filteredRecents.length > 0 && (
           <Card className="space-y-2 workout-card">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Recent</div>
@@ -2575,200 +2510,204 @@ const PlateCalculator = ({ targetWeight, barWeight, onClose }) => {
                             </div>
                           )}
 
-                          <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-[10px] font-black uppercase text-purple-700">Anchored weight</div>
-                                <div className="text-base font-black text-purple-900">
-                                  {anchorWeight && anchorReps ? `${anchorWeight} lb × ${anchorReps} reps` : 'Set your anchor'}
-                                </div>
-                                {anchorAdjusted && <div className="text-[11px] text-purple-700 font-semibold">Adjusted today</div>}
-                              </div>
-                              <button
-                                onClick={() => setShowAdjust(v => !v)}
-                                className="px-3 py-2 rounded-lg bg-white border border-purple-200 text-purple-700 font-bold active:scale-95 text-xs"
-                              >
-                                {showAdjust ? 'Done' : 'Adjust'}
-                              </button>
-                            </div>
-
-                            {showAdjust && (
-                              <div className="grid grid-cols-2 gap-2">
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={anchorWeight}
-                                  onChange={(e) => { setAnchorWeight(e.target.value); setAnchorAdjusted(true); }}
-                                  placeholder="lbs"
-                                  className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
-                                />
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={anchorReps}
-                                  onChange={(e) => { setAnchorReps(e.target.value); setAnchorAdjusted(true); }}
-                                  placeholder="reps"
-                                  className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
-                                />
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between text-sm font-semibold text-purple-900">
-                              <span>Sets completed: {loggedSets.length}</span>
-                              {anchorWeight && anchorReps && (
-                                <span className="text-[11px] text-purple-700 font-bold">Using: {anchorWeight} lb × {anchorReps} reps</span>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                value={setInputs.weight}
-                                onChange={(e) => setSetInputs(prev => ({ ...prev, weight: e.target.value }))}
-                                placeholder="Weight"
-                                ref={weightInputRef}
-                                className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
-                              />
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                value={setInputs.reps}
-                                onChange={(e) => setSetInputs(prev => ({ ...prev, reps: e.target.value }))}
-                                placeholder="Reps"
-                                ref={repsInputRef}
-                                className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleQuickAddSet();
-                              }}
-                              disabled={!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet}
-                              className={`w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                                (!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
-                              }`}
-                            >
-                              <span className="text-lg">＋</span>
-                              {isAddingSet ? 'Adding...' : 'Add Set'}
-                            </button>
-
-                            <div className="text-[10px] text-purple-700/80 font-semibold">
-                              Add sets fast. You can edit or delete any set below.
-                            </div>
-                          </div>
-                          {eq.type === 'barbell' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowPlateCalc(true);
-                              }}
-                              className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                              🏋️ Plate Calculator
-                            </button>
-                          )}
-
-                          <div className="p-3 rounded-2xl bg-white border border-gray-100 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="text-[10px] font-black uppercase text-gray-500">Logged sets</div>
-                              {loggedSets.length > 0 && (
-                                <div className="text-[11px] text-purple-700 font-semibold">{loggedSets.length} sets</div>
-                              )}
-                            </div>
-                            {loggedSets.length === 0 ? (
-                              <div className="text-sm text-gray-500">No sets logged yet.</div>
-                            ) : (
-                              <div className="space-y-2">
-                                {loggedSets.map((s, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`p-3 rounded-xl border ${editingIndex === idx ? 'border-purple-300 bg-purple-50' : 'border-gray-100 bg-gray-50'} flex items-center justify-between gap-3`}
-                                  >
-                                    {editingIndex === idx ? (
-                                      <div className="flex-1 grid grid-cols-2 gap-2">
-                                        <input
-                                          type="number"
-                                          inputMode="numeric"
-                                          value={editValues.weight}
-                                          onChange={(e) => setEditValues(prev => ({ ...prev, weight: e.target.value }))}
-                                          className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
-                                        />
-                                        <input
-                                          type="number"
-                                          inputMode="numeric"
-                                          value={editValues.reps}
-                                          onChange={(e) => setEditValues(prev => ({ ...prev, reps: e.target.value }))}
-                                          className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
-                                        />
-                                        <button
-                                          onClick={saveEditedSet}
-                                          className="col-span-2 py-2 rounded-lg bg-purple-600 text-white font-bold active:scale-95"
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex-1 cursor-pointer" onClick={() => startEditSet(idx)}>
-                                        <div className="text-xs font-black text-gray-900">Set {idx + 1}</div>
-                                        <div className="text-sm font-semibold text-gray-800">{s.weight} lb × {s.reps} reps</div>
-                                      </div>
-                                    )}
-                                    {editingIndex === idx ? (
-                                      <button
-                                        onClick={() => setEditingIndex(null)}
-                                        className="text-gray-500 text-sm font-semibold px-2 py-1"
-                                      >
-                                        Cancel
-                                      </button>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() => startEditSet(idx)}
-                                          className="px-3 py-1 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 active:scale-95"
-                                        >
-                                          Edit
-                                        </button>
-                                        <button
-                                          onClick={() => deleteSet(idx)}
-                                          className="px-3 py-1 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-600 active:scale-95"
-                                        >
-                                          ✕
-                                        </button>
-                                      </div>
-                                    )}
+                          {!isBaselineMode && (
+                            <>
+                              <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-[10px] font-black uppercase text-purple-700">Anchored weight</div>
+                                    <div className="text-base font-black text-purple-900">
+                                      {anchorWeight && anchorReps ? `${anchorWeight} lb × ${anchorReps} reps` : 'Set your anchor'}
+                                    </div>
+                                    {anchorAdjusted && <div className="text-[11px] text-purple-700 font-semibold">Adjusted today</div>}
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                                  <button
+                                    onClick={() => setShowAdjust(v => !v)}
+                                    className="px-3 py-2 rounded-lg bg-white border border-purple-200 text-purple-700 font-bold active:scale-95 text-xs"
+                                  >
+                                    {showAdjust ? 'Done' : 'Adjust'}
+                                  </button>
+                                </div>
 
-                          <div className="p-3 rounded-2xl bg-white border border-gray-100 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-[10px] font-black uppercase text-gray-500">Finish</div>
-                                <div className="text-[11px] text-gray-500">Auto-saves when you close.</div>
+                                {showAdjust && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      value={anchorWeight}
+                                      onChange={(e) => { setAnchorWeight(e.target.value); setAnchorAdjusted(true); }}
+                                      placeholder="lbs"
+                                      className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                                    />
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      value={anchorReps}
+                                      onChange={(e) => { setAnchorReps(e.target.value); setAnchorAdjusted(true); }}
+                                      placeholder="reps"
+                                      className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                                    />
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-sm font-semibold text-purple-900">
+                                  <span>Sets completed: {loggedSets.length}</span>
+                                  {anchorWeight && anchorReps && (
+                                    <span className="text-[11px] text-purple-700 font-bold">Using: {anchorWeight} lb × {anchorReps} reps</span>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={setInputs.weight}
+                                    onChange={(e) => setSetInputs(prev => ({ ...prev, weight: e.target.value }))}
+                                    placeholder="Weight"
+                                    ref={weightInputRef}
+                                    className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                                  />
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={setInputs.reps}
+                                    onChange={(e) => setSetInputs(prev => ({ ...prev, reps: e.target.value }))}
+                                    placeholder="Reps"
+                                    ref={repsInputRef}
+                                    className="w-full p-3 rounded-xl border-2 border-purple-200 bg-white font-black text-center text-gray-900 focus:border-purple-500 outline-none"
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleQuickAddSet();
+                                  }}
+                                  disabled={!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet}
+                                  className={`w-full py-3 rounded-xl font-black text-white transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                    (!setInputs.weight || !setInputs.reps || isBaselineMode || isAddingSet) ? 'bg-purple-200 cursor-not-allowed' : 'bg-purple-600 shadow-lg'
+                                  }`}
+                                >
+                                  <span className="text-lg">＋</span>
+                                  {isAddingSet ? 'Adding...' : 'Add Set'}
+                                </button>
+
+                                <div className="text-[10px] text-purple-700/80 font-semibold">
+                                  Add sets fast. You can edit or delete any set below.
+                                </div>
                               </div>
-                              <button
-                                onClick={handleClose}
-                                className="px-4 py-2 rounded-lg bg-purple-600 text-white font-bold active:scale-95"
-                              >
-                                Workout logged
-                              </button>
-                            </div>
-                            <label className="text-[11px] text-gray-500 font-semibold">Add note (optional)</label>
-                            <textarea
-                              value={note}
-                              onChange={(e) => setNote(e.target.value)}
-                              placeholder="How did this feel?"
-                              className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:border-purple-400 outline-none"
-                              rows={2}
-                            />
-                          </div>
+                              {eq.type === 'barbell' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowPlateCalc(true);
+                                  }}
+                                  className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-white text-purple-700 border border-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                  🏋️ Plate Calculator
+                                </button>
+                              )}
+
+                              <div className="p-3 rounded-2xl bg-white border border-gray-100 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-[10px] font-black uppercase text-gray-500">Logged sets</div>
+                                  {loggedSets.length > 0 && (
+                                    <div className="text-[11px] text-purple-700 font-semibold">{loggedSets.length} sets</div>
+                                  )}
+                                </div>
+                                {loggedSets.length === 0 ? (
+                                  <div className="text-sm text-gray-500">No sets logged yet.</div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {loggedSets.map((s, idx) => (
+                                      <div
+                                        key={idx}
+                                        className={`p-3 rounded-xl border ${editingIndex === idx ? 'border-purple-300 bg-purple-50' : 'border-gray-100 bg-gray-50'} flex items-center justify-between gap-3`}
+                                      >
+                                        {editingIndex === idx ? (
+                                          <div className="flex-1 grid grid-cols-2 gap-2">
+                                            <input
+                                              type="number"
+                                              inputMode="numeric"
+                                              value={editValues.weight}
+                                              onChange={(e) => setEditValues(prev => ({ ...prev, weight: e.target.value }))}
+                                              className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
+                                            />
+                                            <input
+                                              type="number"
+                                              inputMode="numeric"
+                                              value={editValues.reps}
+                                              onChange={(e) => setEditValues(prev => ({ ...prev, reps: e.target.value }))}
+                                              className="w-full p-2 rounded-lg border-2 border-purple-200 bg-white font-bold text-center text-gray-900 focus:border-purple-500 outline-none"
+                                            />
+                                            <button
+                                              onClick={saveEditedSet}
+                                              className="col-span-2 py-2 rounded-lg bg-purple-600 text-white font-bold active:scale-95"
+                                            >
+                                              Save
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex-1 cursor-pointer" onClick={() => startEditSet(idx)}>
+                                            <div className="text-xs font-black text-gray-900">Set {idx + 1}</div>
+                                            <div className="text-sm font-semibold text-gray-800">{s.weight} lb × {s.reps} reps</div>
+                                          </div>
+                                        )}
+                                        {editingIndex === idx ? (
+                                          <button
+                                            onClick={() => setEditingIndex(null)}
+                                            className="text-gray-500 text-sm font-semibold px-2 py-1"
+                                          >
+                                            Cancel
+                                          </button>
+                                        ) : (
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              onClick={() => startEditSet(idx)}
+                                              className="px-3 py-1 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 active:scale-95"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              onClick={() => deleteSet(idx)}
+                                              className="px-3 py-1 rounded-lg bg-red-50 border border-red-200 text-xs font-bold text-red-600 active:scale-95"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="p-3 rounded-2xl bg-white border border-gray-100 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="text-[10px] font-black uppercase text-gray-500">Finish</div>
+                                    <div className="text-[11px] text-gray-500">Auto-saves when you close.</div>
+                                  </div>
+                                  <button
+                                    onClick={handleClose}
+                                    className="px-4 py-2 rounded-lg bg-purple-600 text-white font-bold active:scale-95"
+                                  >
+                                    Workout logged
+                                  </button>
+                                </div>
+                                <label className="text-[11px] text-gray-500 font-semibold">Add note (optional)</label>
+                                <textarea
+                                  value={note}
+                                  onChange={(e) => setNote(e.target.value)}
+                                  placeholder="How did this feel?"
+                                  className="w-full p-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:border-purple-400 outline-none"
+                                  rows={2}
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3956,7 +3895,7 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
       }, [sessionStartNotice]);
 
       const pushMessage = (text) => {
-        if (!text) return;
+        if (!text || text === 'Workout saved.') return;
         setInlineMessage(text);
         if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
         messageTimerRef.current = setTimeout(() => setInlineMessage(null), 3200);
@@ -4509,9 +4448,11 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
       const addExerciseToSession = (id, options = {}) => {
         if (isRestDay) return;
         if (!id) return;
+        if (!activeSessionToday) return;
         let didAdd = false;
         setActiveSession(prev => {
-          const base = (!prev || prev.date !== todayKey) ? createEmptySession({ createdFrom: options.createdFrom || 'manual' }) : prev;
+          if (!prev || prev.date !== todayKey) return prev;
+          const base = prev;
           const items = [...(base.items || [])];
           const logsByExercise = { ...(base.logsByExercise || {}) };
           if (!items.find(item => (item.exerciseId || item.id) === id)) {
@@ -4540,6 +4481,8 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
           return;
         }
         if (!id) return;
+        if (!activeSessionToday) return;
+        if (EQUIPMENT_DB[id]?.comingSoon) return;
         if (mode === 'session') {
           const entry = activeSessionToday?.items?.find(item => (item.exerciseId || item.id) === id);
           if (entry?.kind === 'cardio') {
