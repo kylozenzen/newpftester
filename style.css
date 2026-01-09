@@ -173,6 +173,17 @@ body.app-shell {
   letter-spacing: 0.08em;
 }
 
+.home-section-title--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-section-chevron {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .home-section-subtitle {
   font-size: 14px;
   font-weight: 700;

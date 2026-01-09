@@ -1606,7 +1606,10 @@ const Home = ({
             </button>
           </div>
           <div className="home-section-card">
-            <div className="home-section-title">Quick Generate</div>
+            <div className="home-section-title home-section-title--row">
+              <span>Quick Generate</span>
+              <span className="home-section-chevron" aria-hidden="true">›</span>
+            </div>
             <div className="home-quick-generate no-scrollbar">
               {['Push', 'Pull', 'Legs', 'Full Body', 'Surprise Me'].map(label => (
                 <button
@@ -1759,6 +1762,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
   const renderExerciseRow = (id, actionLabel = 'Add', onAction) => {
     const eq = EQUIPMENT_DB[id];
     if (!eq) return null;
+    const allowAdd = hasTodayWorkout && !isRestDay;
     return (
       <div
         key={id}
@@ -1780,7 +1784,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           >
             {pinnedExercises.includes(id) ? 'Pinned' : 'Pin'}
           </button>
-          {!isRestDay && (
+          {allowAdd && (
             <button
               onClick={(e) => { e.stopPropagation(); (onAction ? onAction(id) : onAddExerciseFromSearch?.(id)); }}
               className="text-purple-600 font-semibold text-sm"
@@ -1798,6 +1802,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
     if (!eq) return null;
     const pinned = pinnedExercises.includes(id);
     const typeIcon = getExerciseIcon(eq);
+    const allowAdd = hasTodayWorkout && !isRestDay;
     return (
       <div key={id} className="tile text-left">
         <div className="flex items-center justify-between mb-1">
@@ -1812,7 +1817,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           >
             {pinned ? 'Pinned' : 'Pin'}
           </button>
-          {!isRestDay && (
+          {allowAdd && (
             <button
               onClick={() => onAddExerciseFromSearch?.(id)}
               className="tile-action primary"
@@ -1873,16 +1878,15 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           <div className="space-y-2">
             <button
               onClick={() => onStartEmptySession?.()}
-              disabled={isRestDay}
+              disabled={isRestDay || hasTodayWorkout}
               className={`w-full py-3 rounded-xl font-bold active:scale-[0.98] ${
-                isRestDay ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-purple-600 text-white'
+                (isRestDay || hasTodayWorkout) ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-purple-600 text-white'
               }`}
             >
-              Start Today
+              {hasTodayWorkout ? 'Drafted for today' : 'Start Today'}
             </button>
             <button
               onClick={() => {
-                if (!hasTodayWorkout) onStartEmptySession?.();
                 setLibraryVisible(prev => !prev);
                 setActiveFilter('All');
               }}
@@ -1891,7 +1895,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
                 isRestDay ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-200 bg-white text-gray-900'
               }`}
             >
-              {libraryVisible ? 'Close exercises' : 'Browse full library'}
+              {libraryVisible ? 'Close' : 'Browse full library'}
             </button>
           </div>
           <div className="relative">
@@ -1940,7 +1944,13 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
                 <div className="text-[11px] workout-muted">{isSessionMode ? 'Log as you go' : 'Edit and start when ready'}</div>
               </div>
               <button
-                onClick={() => onCancelSession?.(isSessionMode, sessionHasLogged)}
+                onClick={() => {
+                  onCancelSession?.(isSessionMode, sessionHasLogged);
+                  setLibraryVisible(false);
+                  setSearchQuery('');
+                  setActiveFilter('All');
+                  setSwapState(null);
+                }}
                 className="session-cancel-button"
               >
                 {isSessionMode ? 'Cancel workout' : 'Cancel draft'}
@@ -2035,7 +2045,7 @@ const Workout = ({ profile, onSelectExercise, settings, setSettings, pinnedExerc
           </Card>
         )}
 
-        {libraryVisible && hasTodayWorkout && !isRestDay && (
+        {libraryVisible && !isRestDay && (
           <Card className="space-y-2 workout-card">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold workout-muted uppercase">Full Library</div>
@@ -4650,6 +4660,7 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
         if (isRestDay) return;
         if (!exerciseId) return;
         const eq = EQUIPMENT_DB[exerciseId];
+        const cardioType = exerciseId.startsWith('cardio_') ? exerciseId.replace('cardio_', '') : exerciseId;
         const totalMinutes = entries.reduce((sum, entry) => sum + (entry.minutes || 0), 0);
         const session = {
           date: new Date().toISOString(),
@@ -4657,6 +4668,7 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
           entries: [...entries],
           duration: totalMinutes || null,
           cardioLabel: eq?.name || 'Cardio',
+          cardioType,
           cardioGroup: eq?.cardioGroup || null
         };
         setHistory(prev => {
@@ -4668,6 +4680,17 @@ const CardioLogger = ({ id, onClose, onUpdateSessionLogs, sessionLogs }) => {
           else updated.push(session);
           return { ...prev, [exerciseId]: updated };
         });
+        if (exerciseId.startsWith('cardio_')) {
+          setCardioHistory(prev => {
+            const prevSessions = prev[cardioType] || [];
+            const sessionDay = toDayKey(new Date(session.date));
+            const existingIdx = prevSessions.findIndex(s => toDayKey(new Date(s.date)) === sessionDay);
+            const updated = [...prevSessions];
+            if (existingIdx >= 0) updated[existingIdx] = session;
+            else updated.push(session);
+            return { ...prev, [cardioType]: updated };
+          });
+        }
         recordDayEntry(todayKey, 'workout', {
           exercises: Array.from(new Set([...(dayEntries[todayKey]?.exercises || []), exerciseId]))
         });
@@ -4890,7 +4913,7 @@ return (
           <InstallPrompt />
           <div className="app-root bg-gray-50 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-hidden">
-              <InlineMessage message={inlineMessage} />
+              <InlineMessage message={tab === 'home' && inlineMessage === 'Workout saved.' ? null : inlineMessage} />
               <Toast message={toastMessage} />
               {showPostWorkout && (
                 <div className="post-workout-screen" onClick={() => setShowPostWorkout(false)}>
