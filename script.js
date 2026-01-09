@@ -3,7 +3,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
     const FEEDBACK_EMAIL = 'hirebencampbell@gmail.com';
     const FOLLOW_URL = 'https://www.instagram.com/bensoup/';
     const DONATE_URL = 'https://account.venmo.com/u/bensoup';
-    const APP_VERSION = '1.0.0';
+    const APP_VERSION = '1.0.0'
 
     // ========== PWA SETUP ==========
     // Confirm manifest + icon links (guarded for templates that omit them).
@@ -12,13 +12,30 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
     const iconLink = document.getElementById('app-icon');
     const appleTouchLink = document.getElementById('apple-touch-icon');
     const APP_ICON_SVG = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-        <rect width="512" height="512" rx="120" fill="#0b1020"/>
-        <rect x="96" y="224" width="320" height="64" rx="32" fill="none" stroke="rgba(139, 92, 246, 0.55)" stroke-width="14"/>
-        <rect x="80" y="206" width="40" height="100" rx="16" fill="#f5f3ff" opacity="0.9"/>
-        <rect x="392" y="206" width="40" height="100" rx="16" fill="#f5f3ff" opacity="0.9"/>
-        <line x1="156" y1="256" x2="356" y2="256" stroke="#f5f3ff" stroke-width="10" stroke-linecap="round"/>
-        <text x="256" y="338" text-anchor="middle" font-size="96" font-weight="700" fill="#f5f3ff" font-family="Inter, system-ui, sans-serif">PS</text>
+      <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="spaceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#2b1055;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#7597de;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="metalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#e0e0e0;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#9e9e9e;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#spaceGrad)" />
+        <circle cx="200" cy="200" r="10" fill="white" opacity="0.8"/>
+        <circle cx="800" cy="150" r="6" fill="white" opacity="0.6"/>
+        <circle cx="900" cy="800" r="8" fill="white" opacity="0.7"/>
+        <circle cx="100" cy="900" r="5" fill="white" opacity="0.5"/>
+        <circle cx="500" cy="100" r="4" fill="white" opacity="0.4"/>
+        <circle cx="512" cy="512" r="280" fill="#7245d8" />
+        <path d="M 232 512 C 232 400, 792 400, 792 512" stroke="#4cc9f0" stroke-width="40" fill="none" opacity="0.6" stroke-linecap="round"/>
+        <rect x="312" y="472" width="400" height="80" rx="10" fill="#b0bec5" />
+        <rect x="232" y="412" width="60" height="200" rx="15" fill="url(#metalGrad)" />
+        <rect x="192" y="432" width="40" height="160" rx="10" fill="#78909c" />
+        <rect x="732" y="412" width="60" height="200" rx="15" fill="url(#metalGrad)" />
+        <rect x="792" y="432" width="40" height="160" rx="10" fill="#78909c" />
       </svg>
     `.trim();
     const svgDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(APP_ICON_SVG)}`;
