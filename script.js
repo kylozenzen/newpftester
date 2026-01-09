@@ -1,8 +1,8 @@
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-    const FEEDBACK_EMAIL = 'hello@planetstrength.app';
-    const FOLLOW_URL = 'https://example.com/planet-strength';
-    const DONATE_URL = 'https://example.com/support-planet-strength';
+    const FEEDBACK_EMAIL = 'hirebencampbell@gmail.com';
+    const FOLLOW_URL = 'https://www.instagram.com/bensoup/';
+    const DONATE_URL = 'https://account.venmo.com/u/bensoup';
     const APP_VERSION = '1.0.0';
 
     // ========== PWA SETUP ==========
