@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Planet Strength</title>
+  <meta name="application-name" content="Planet Strength" />
+  <meta name="apple-mobile-web-app-title" content="Planet Strength" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Planet Strength is a calm, simple tracker for Today’s Workout." />
+  <meta name="theme-color" content="#8b5cf6" />
+  <meta name="color-scheme" content="light dark" />
+  <link id="manifest-placeholder" rel="manifest" href="manifest.json" />
+  <link id="app-icon" rel="icon" href="icons/icon-192.svg" />
+  <link id="apple-touch-icon" rel="apple-touch-icon" href="" />
+  <link rel="stylesheet" href="style.css" />
+  <script>tailwind = { disableWarning: true }</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="app-shell">
+  <div id="root"></div>
+  <div id="install-prompt" aria-live="polite"></div>
+
+  <!-- App logic -->
+  <script type="text/babel" data-presets="env,react" src="script.js"></script>
+</body>
+</html>
